@@ -64,9 +64,9 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
     @Override
     public List<CartVO> queryMyCarts() {
         // 1.查询我的购物车列表
-        // TODO UserContext.getUser()
-        List<Cart> carts = lambdaQuery().eq(Cart::getUserId, 1L).list();
-        System.out.println("carts = " + carts);
+        List<Cart> carts = lambdaQuery().eq(Cart::getUserId, UserContext.getUser()).list();
+        // System.out.println("carts = " + carts);
+        System.out.println("userId = " + UserContext.getUser());
         if (CollUtils.isEmpty(carts)) {
             return CollUtils.emptyList();
         }
