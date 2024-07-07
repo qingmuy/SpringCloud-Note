@@ -726,3 +726,164 @@ org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
   com.hmall.common.config.MvcConfig,\
   com.hmall.common.config.JsonConfig
 ```
+
+
+
+#### openFeign传递用户
+
+尽管上述的方法将用户信息存储在了线程中，但是对于一些复杂的业务：需要调用其他模块的业务而言，由于不同的实例间线程不一致，无法继续保存用户信息，所以需要**在微服务发起调用时把用户信息存入请求头**。
+
+
+
+微服务之间调用是基于OpenFeign来实现的，并不是我们自己发送的请求。我们如何才能让每一个由OpenFeign发起的请求自动携带登录用户信息呢？
+
+这里要借助Feign中提供的一个拦截器接口：`feign.RequestInterceptor`
+
+```Java
+public interface RequestInterceptor {
+
+  /**
+   * Called for every request. 
+   * Add data using methods on the supplied {@link RequestTemplate}.
+   */
+  void apply(RequestTemplate template);
+}
+```
+
+
+
+我们只需要实现这个接口，然后实现apply方法，利用`RequestTemplate`类来添加请求头，将用户信息保存到请求头中。这样以来，每次OpenFeign发起请求的时候都会调用该方法，传递用户信息。
+
+将该拦截器的配置写入`FeignClient`的api模块中：
+
+在`com.qingmuy.api.config.DefaultFeignConfig`中添加一个Bean：
+
+```Java
+@Bean
+public RequestInterceptor userInfoRequestInterceptor(){
+    return new RequestInterceptor() {
+        @Override
+        public void apply(RequestTemplate template) {
+            // 获取登录用户
+            Long userId = UserContext.getUser();
+            if(userId == null) {
+                // 如果为空则直接跳过
+                return;
+            }
+            // 如果不为空则放入请求头中，传递给下游微服务
+            template.header("user-info", userId.toString());
+        }
+    };
+}
+```
+
+
+
+### 配置管理
+
+微服务的多模块特性导致配置文件数量多，不易维护，可以通过Nacos的配置管理器服务统一管理。
+
+![img](./assets/1720360260698-4.jpeg)
+
+微服务共享的配置可以统一交给Nacos保存和管理，在Nacos控制台修改配置后，Nacos会将配置变更推送给相关的微服务，并且无需重启即可生效，实现配置热更新。
+
+网关的路由同样是配置，因此同样可以基于这个功能实现动态路由功能，无需重启网关即可修改路由配置。
+
+
+
+#### 配置共享
+
+我们可以把微服务共享的配置抽取到Nacos中统一管理，这样就不需要每个微服务都重复配置了。分为两步：
+
+- 在Nacos中添加共享配置
+- 微服务拉取配置
+
+
+
+##### 添加共享配置
+
+将配置文件中重复的部分抽取出来，在Nacos中的`配置管理`->`配置列表`中点击`+`新建一个配置，键入信息即可。
+
+在可设定的参数的后方使用`:`连接默认设置，如
+
+```yaml
+username: ${muy.database.username:dingzhen}
+```
+
+
+
+##### 拉取共享配置
+
+需要注意的是，读取Nacos配置是SpringCloud上下文（`ApplicationContext`）初始化时处理的，发生在项目的引导阶段。然后才会初始化SpringBoot上下文，去读取`application.yaml`。
+
+也就是说引导阶段，`application.yaml`文件尚未读取，根本不知道nacos 地址，该如何去加载nacos中的配置文件呢？
+
+SpringCloud在初始化上下文的时候会先读取一个名为`bootstrap.yaml`(或者`bootstrap.properties`)的文件，如果我们将nacos地址配置到`bootstrap.yaml`中，那么在项目引导阶段就可以读取nacos中的配置了。
+
+![img](./assets/1720361458684-7.jpeg)
+
+
+
+因此，微服务整合Nacos配置管理的步骤如下：
+
+1. 引入依赖：
+
+在cart-service模块引入依赖：
+
+```XML
+  <!--nacos配置管理-->
+  <dependency>
+      <groupId>com.alibaba.cloud</groupId>
+      <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+  </dependency>
+  <!--读取bootstrap文件-->
+  <dependency>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-starter-bootstrap</artifactId>
+  </dependency>
+```
+
+2. 新建bootstrap.yaml
+
+在cart-service中的resources目录新建一个bootstrap.yaml文件：
+
+![img](./assets/1720361476072-10.png)
+
+内容如下：
+
+```YAML
+spring:
+  application:
+    name: cart-service # 服务名称
+  profiles:
+    active: dev
+  cloud:
+    nacos:
+      server-addr: 192.168.150.101 # nacos地址
+      config:
+        file-extension: yaml # 文件后缀名
+        shared-configs: # 共享配置
+          - dataId: shared-jdbc.yaml # 共享mybatis配置
+          - dataId: shared-log.yaml # 共享日志配置
+          - dataId: shared-swagger.yaml # 共享日志配置
+```
+
+3. 修改application.yaml
+
+由于一些配置挪到了bootstrap.yaml，因此application.yaml需要修改为：
+
+```YAML
+server:
+  port: 8082
+feign:
+  okhttp:
+    enabled: true # 开启OKHttp连接池支持
+hm:
+  swagger:
+    title: 购物车服务接口文档
+    package: com.hmall.cart.controller
+  db:
+    database: hm-cart
+```
+
+重启服务，发现所有配置都生效了。

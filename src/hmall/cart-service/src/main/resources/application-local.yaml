@@ -1,4 +1,11 @@
+server:
+  port: 8082
+feign:
+  okhttp:
+    enabled: true # 开启OKHttp连接池支持
 hm:
+  swagger:
+    title: 购物车服务接口文档
+    package: com.hmall.cart.controller
   db:
-    host: 192.168.197.133 # 修改为你自己的虚拟机IP地址
-    pw: 123 # 修改为docker中的MySQL密码
+    database: hm-cart
