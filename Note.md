@@ -887,3 +887,203 @@ hm:
 ```
 
 重启服务，发现所有配置都生效了。
+
+
+
+#### 配置热更新
+
+当修改配置文件中的配置时，微服务无需重启即可使配置生效。
+
+前提条件：
+
+1. nacos中要有一个与微服务名有关的配置文件，命名格式为
+
+[spring.application.name]-[spring.active.profile].[file-extension]
+
+其中第一个字段微服务名称；第二个字段为项目profile，为可选参数；第三个字段为文件后缀名。
+
+微服务在启动时会自动寻找相同名称的配置文件读取。
+
+2. 微服务要以特定的方式读取需要热更新的配置属性
+
+有两种配置方式：
+
+一为直接读取配置文件：
+
+```java
+@Data
+@ConfigurationProperties(prefix = "hm.cart")
+public class CartProperties {
+    private int maxItems;
+}
+```
+
+另一种为使用注解标准热更新
+
+```java
+@Data
+@RefreshScope
+public class CartProperties {
+    @Value("${hm.cart.maxItems}")
+    private int maxItems;
+}
+```
+
+
+
+#### 动态路由
+
+要实现动态路由首先要将路由配置保存到Nacos，当Nacos中的路由配置变更时，推送最新配置到网关，实时更新网关中的路由信息。
+
+我们需要完成两件事情:
+
+1. 监听Nacos配置变更的消息
+2. 当配置变更时，将最新的路由信息更新到网关路由表 
+
+
+
+基于Nacos的源码[Java SDK (nacos.io)](https://nacos.io/zh-cn/docs/sdk.html)得知：Nacos会在项目启动时自动拉取配置并写入路由，而且可以自定义添加监听器。
+
+所以可以在网关`Gateway`中新建一个`routers`包用于定义配置监听器：
+
+![img](./assets/1720433296942-1.png)
+
+配置动态路由需要两个必要的Bean组件，分别为：`NacosConfigManager`和`RouteDefinitionWriter`
+
+其中`NacosConfigManager`用于控制Nacos配置监听器以及拉取配置更新；`RouteDefinitionWriter`用于将路由写入路由表或删除路由表。
+
+
+
+首先控制路由的热更新，需要完成路由的更新操作，这就需要先完成路由表的初始化操作：初始化监听器
+
+```java
+@PostConstruct  // 在bean初始化时执行
+    public void initRouteConfigListener() throws NacosException {
+        // 项目启动时，先拉取一次配置，并且添加配置监听器
+        String configInfo = nacosConfigManager.getConfigService()
+                // 拉取配置并建立监听器
+                .getConfigAndSignListener(dataId, group, 5000, new Listener() {
+
+                    @Override
+                    public Executor getExecutor() {
+                        // 返回一个线程池：监听器的执行会异步执行
+                        return null;
+                    }
+
+                    @Override
+                    public void receiveConfigInfo(String configInfo) {
+                        // 监听到配置变更， 需要去更新路由表
+                        updateConfigInfo(configInfo);
+                    }
+                });
+        // 第一次读取到配置，也需要更新到路由表
+        updateConfigInfo(configInfo);
+    }
+```
+
+`@PostConstruct`注解会在该组件类加载时先执行当前方法，这也就确保了初始化的完成。
+
+通过`getConfigAndSignListener`方法可以实现拉取配置并建立监听器的操作，监听器`Listener`是一个接口，需要完成两个方法：`getExecutor`和`receiveConfigInfo`，其中`getExecutor`是返回一个线程池：便于在复杂业务时控制监听器；而`receiveConfigInfo`则会监听配置的更新并拉取配置信息。
+
+拉取配置并建立监听器后需要更新到路由表，此时再利用`RouteDefinitionWriter`完成对路由表的操作。
+
+```java
+public void updateConfigInfo(String configInfo){
+    log.info("监听到路由配置信息：{}", configInfo);
+    // 1. 解析配置信息，转为RouteDefinition
+    List<RouteDefinition> routeDefinitions = JSONUtil.toList(configInfo, RouteDefinition.class);
+    // 2. 删除旧的路由表
+    for (String routeId : routeIds) {
+        writer.delete(Mono.just(routeId)).subscribe();
+    }
+    routeIds.clear();
+    // 3. 更新路由表
+    for (RouteDefinition routeDefinition : routeDefinitions) {
+        // 更新路由表，将路由表转化为Mono类型
+        writer.save(Mono.just(routeDefinition)).subscribe();    // subscribe会立即使更新生效：订阅
+        // 记录路由id，便于下一次更新时删除
+        routeIds.add(routeDefinition.getId());
+    }
+}
+```
+
+读取配置文件时，需要将配置文件解析，但是由于`yaml`配置文件不方便解析，所以将会使用`json`格式存储路由配置，故读取的配置文件为`json`类型，再将`json`文件读取并转换为列表类型即可。
+
+对于路由表的更新操作，如果为增添路由，则将新的路由表写入即可，所以使用循环的方式全部写入，需要注意的是在写入时需要将`RouteDefinition`路由格式转为`Mono`格式，再调用`subscribe()`方法使更新立即生效。
+
+而如果是删除路由操作，则需要删除全部的路由表再全部添加即可，而删除路由表需要逐个删除且使用的是路由的id，而当前并无方法获取路由表中路由的id，而在初始化的过程中会在第一次读取配置时调用更新路由方法，可以编写一个固定的`Set`集合用于存储路由的id，故当初始化时会记录各个路由id，后续更新操作均会保存路由id。
+
+
+
+## 微服务保护和分布式事务
+
+
+
+### 雪崩问题
+
+微服务调用链路中的某个服务故障，引起整个链路中的所有微服务都不可用，这就是雪崩。
+
+
+
+雪崩问题产生的原因是什么?
+
+- 微服务相互调用，服务提供者出现故障或阻塞。
+- 服务调用者没有做好异常处理，导致自身故障。
+- 调用链中的所有服务级联失败，导致整个集群故障
+
+
+
+解决问题的思路有哪些?
+
+- 尽量避免服务出现故障或阻塞。
+  - 保证代码的健壮性;
+  - 保证网络畅通;
+  - 能应对较高的并发请求;
+- 服务调用者做好远程调用异常的后备方案，避免故障扩散
+
+
+
+#### 解决方案
+
+1. 请求限流：限制访问微服务的请求的并发量，避免服务因流量激增出现故障。
+
+2. 线程隔离︰也叫做舱壁模式，模拟船舱隔板的防水原理。通过限定每个业务能使用的线程数量而将故障业务隔离，避免故障扩散。
+3. 服务熔断:由断路器统计请求的异常比例或慢调用比例，如果超出阈值则会熔断该业务，则拦截该接口的请求。熔断期间，所有请求快速失败，全都走fallback逻辑。
+4. 失败处理:定义fallback逻辑，让业务失败时不冉把出异吊，定及回默认数据或友好提示
+
+
+
+##### 请求限流
+
+服务故障最重要原因，就是并发太高！解决了这个问题，就能避免大部分故障。当然，接口的并发不是一直很高，而是突发的。因此请求限流，就是**限制或控制**接口访问的并发流量，避免服务因流量激增而出现故障。
+
+请求限流往往会有一个限流器，数量高低起伏的并发请求曲线，经过限流器就变的非常平稳。这就像是水电站的大坝，起到蓄水的作用，可以通过开关控制水流出的大小，让下游水流始终维持在一个平稳的量。
+
+![img](./assets/1720440005479-2.jpeg)
+
+##### 线程隔离
+
+当一个业务接口响应时间长，而且并发高时，就可能耗尽服务器的线程资源，导致服务内的其它接口受到影响。所以我们必须把这种影响降低，或者缩减影响的范围。线程隔离正是解决这个问题的好办法。
+
+线程隔离的思想来自轮船的舱壁模式：
+
+![img](./assets/1720440005479-1.png)
+
+轮船的船舱会被隔板分割为N个相互隔离的密闭舱，假如轮船触礁进水，只有损坏的部分密闭舱会进水，而其他舱由于相互隔离，并不会进水。这样就把进水控制在部分船体，避免了整个船舱进水而沉没。
+
+为了避免某个接口故障或压力过大导致整个服务不可用，我们可以限定每个接口可以使用的资源范围，也就是将其“隔离”起来。
+
+![image-20240708200101986](./assets/image-20240708200101986.png)
+
+如图所示，我们给查询购物车业务限定可用线程数量上限为20，这样即便查询购物车的请求因为查询商品服务而出现故障，也不会导致服务器的线程资源被耗尽，不会影响到其它接口。
+
+##### 服务熔断
+
+线程隔离虽然避免了雪崩问题，但故障服务（商品服务）依然会拖慢购物车服务（服务调用方）的接口响应速度。而且商品查询的故障依然会导致查询购物车功能出现故障，购物车业务也变的不可用了。
+
+所以，我们要做两件事情：
+
+- **编写服务降级逻辑**：就是服务调用失败后的处理逻辑，根据业务场景，可以抛出异常，也可以返回友好提示或默认数据。
+- **异常统计和熔断**：统计服务提供方的异常比例，当比例过高表明该接口会影响到其它服务，应该拒绝调用该接口，而是直接走降级逻辑。
+
+![image-20240708200047016](./assets/image-20240708200047016.png)
