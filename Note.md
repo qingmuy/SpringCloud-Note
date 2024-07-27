@@ -1087,3 +1087,451 @@ public void updateConfigInfo(String configInfo){
 - **异常统计和熔断**：统计服务提供方的异常比例，当比例过高表明该接口会影响到其它服务，应该拒绝调用该接口，而是直接走降级逻辑。
 
 ![image-20240708200047016](./assets/image-20240708200047016.png)
+
+
+
+
+
+## MQ
+
+
+
+- 同步通讯：就如同打视频电话，双方的交互都是实时的。因此同一时刻你只能跟一个人打视频电话。
+- 异步通讯：就如同发微信聊天，双方的交互不是实时的，你不需要立刻给对方回应。因此你可以多线操作，同时跟多人聊天。
+
+
+
+### 基础
+
+业务需要实时得到服务提供方的响应，则应该选择同步通讯（同步调用）。而如果追求更高的效率，并且不需要实时响应，则应该选择异步通讯（异步调用）。
+
+
+
+#### 同步调用
+
+对于一个业务流程而言，多个微服务之间的调用就是同步通讯，必须等待上一个服务结束后才可以执行，这就导致：
+
+- 拓展性差
+- 性能下降
+- 级联失败
+
+所以需要使用异步调用代替同步调用
+
+
+
+#### 异步调用
+
+异步调用方式其实就是基于消息通知的方式，一般包含三个角色：
+
+- 消息发送者：投递消息的人，就是原来的调用方
+- 消息Broker：管理、暂存、转发消息，你可以把它理解成微信服务器
+- 消息接收者：接收和处理消息的人，就是原来的服务提供方
+
+![image-20240727220800990](./assets/image-20240727220800990.png)
+
+在异步调用中，发送者不再直接同步调用接收者的业务接口，而是发送一条消息投递给消息Broker。然后接收者根据自己的需求从消息Broker那里订阅消息。每当发送方发送消息后，接受者都能获取消息并处理。
+
+这样，发送消息的人和接收消息的人就完全解耦了。
+
+
+
+异步调用的优势包括：
+
+- 耦合度更低
+- 性能更好
+- 业务拓展性强
+- 故障隔离，避免级联失败
+
+当然，异步通信也并非完美无缺，它存在下列缺点：
+
+- 完全依赖于Broker的可靠性、安全性和性能
+- 架构复杂，后期维护和调试麻烦
+
+
+
+#### 相关技术
+
+消息Broker，目前常见的实现方案就是消息队列（MessageQueue），简称为MQ.
+
+目比较常见的MQ实现：
+
+- ActiveMQ
+- RabbitMQ
+- RocketMQ
+- Kafka
+
+几种常见MQ的对比：
+
+|            | RabbitMQ                | ActiveMQ                       | RocketMQ   | Kafka      |
+| ---------- | ----------------------- | ------------------------------ | ---------- | ---------- |
+| 公司/社区  | Rabbit                  | Apache                         | 阿里       | Apache     |
+| 开发语言   | Erlang                  | Java                           | Java       | Scala&Java |
+| 协议支持   | AMQP，XMPP，SMTP，STOMP | OpenWire,STOMP，REST,XMPP,AMQP | 自定义协议 | 自定义协议 |
+| 可用性     | 高                      | 一般                           | 高         | 高         |
+| 单机吞吐量 | 一般                    | 差                             | 高         | 非常高     |
+| 消息延迟   | 微秒级                  | 毫秒级                         | 毫秒级     | 毫秒以内   |
+| 消息可靠性 | 高                      | 一般                           | 高         | 一般       |
+
+追求可用性：Kafka、 RocketMQ 、RabbitMQ
+
+追求可靠性：RabbitMQ、RocketMQ
+
+追求吞吐能力：RocketMQ、Kafka
+
+追求消息低延迟：RabbitMQ、Kafka
+
+
+
+### RabbitMQ
+
+RabbitMQ是基于Erlang语言开发的开源消息通信中间件，官网地址：
+
+https://www.rabbitmq.com/
+
+
+
+#### 安装
+
+基于Docker安装RabbitMQ
+
+```shell
+docker run \
+ -e RABBITMQ_DEFAULT_USER=itheima \
+ -e RABBITMQ_DEFAULT_PASS=123321 \
+ -v mq-plugins:/plugins \
+ --name mq \
+ --hostname mq \
+ -p 15672:15672 \
+ -p 5672:5672 \
+ --network hm-net\
+ -d \
+ rabbitmq:3.8-management
+```
+
+
+
+RabbitMQ对应的架构如图：
+
+![img](./assets/1722089444322-1.png)
+
+其中包含几个概念：
+
+- **`publisher`**：生产者，也就是发送消息的一方
+- **`consumer`**：消费者，也就是消费消息的一方
+- **`queue`**：队列，存储消息。生产者投递的消息会暂存在消息队列中，等待消费者处理
+- **`exchange`**：交换机，负责消息路由。生产者发送的消息由交换机决定投递到哪个队列。
+- **`virtual host`**：虚拟主机，起到数据隔离的作用。每个虚拟主机相互独立，有各自的exchange、queue
+
+
+
+#### 收发消息
+
+##### 交换机
+
+可以使用交换机给队列发送消息，需要注意的是**交换机没有存储消息的能力**。
+
+
+
+##### 队列
+
+队列需要与交换机绑定后才能收发消息。
+
+
+
+##### 绑定关系
+
+点击`Exchanges`选项卡，点击对应交换机，进入交换机详情页，然后点击`Bindings`菜单，在表单中填写要绑定的队列名称，点击`bind`绑定即可。
+
+
+
+#### 数据隔离
+
+##### 用户管理
+
+- `Name`：也就是用户名
+- `Tags`：`administrator`，说明`itheima`用户是超级管理员，拥有所有权限
+- `Can access virtual host`： `/`，可以访问的`virtual host`，这里的`/`是默认的`virtual host`
+
+对于小型企业而言，出于成本考虑，我们通常只会搭建一套MQ集群，公司内的多个不同项目同时使用。这个时候为了避免互相干扰， 我们会利用`virtual host`的隔离特性，将不同项目隔离。一般会做两件事情：
+
+- 给每个项目创建独立的运维账号，将管理权限分离。
+- 给每个项目创建不同的`virtual host`，将每个项目的数据隔离。
+
+
+
+##### virtual host
+
+基于`virtual host `实现了隔离效果。
+
+
+
+### SpringAMOP
+
+#### 导入依赖
+
+```XML
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>cn.itcast.demo</groupId>
+    <artifactId>mq-demo</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <modules>
+        <module>publisher</module>
+        <module>consumer</module>
+    </modules>
+    <packaging>pom</packaging>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.7.12</version>
+        <relativePath/>
+    </parent>
+
+    <properties>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+        <!--AMQP依赖，包含RabbitMQ-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+        <!--单元测试-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+        </dependency>
+    </dependencies>
+</project>
+```
+
+
+
+#### 基础使用
+
+
+
+##### 消息发送
+
+首先配置MQ地址，在`publisher`服务的`application.yml`中添加配置：
+
+```YAML
+spring:
+  rabbitmq:
+    host: 192.168.150.101 # 你的虚拟机IP
+    port: 5672 # 端口
+    virtual-host: /hmall # 虚拟主机
+    username: hmall # 用户名
+    password: 123 # 密码
+```
+
+然后在`publisher`服务中编写测试类`SpringAmqpTest`，并利用`RabbitTemplate`实现消息发送：
+
+```Java
+package com.itheima.publisher.amqp;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+public class SpringAmqpTest {
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
+
+    @Test
+    public void testSimpleQueue() {
+        // 队列名称
+        String queueName = "simple.queue";
+        // 消息
+        String message = "hello, spring amqp!";
+        // 发送消息
+        rabbitTemplate.convertAndSend(queueName, message);
+    }
+}
+```
+
+
+
+##### 消息接收
+
+首先配置MQ地址，在`consumer`服务的`application.yml`中添加配置：
+
+```YAML
+spring:
+  rabbitmq:
+    host: 192.168.150.101 # 你的虚拟机IP
+    port: 5672 # 端口
+    virtual-host: /hmall # 虚拟主机
+    username: hmall # 用户名
+    password: 123 # 密码
+```
+
+然后在`consumer`服务的`com.itheima.consumer.listener`包中新建一个类`SpringRabbitListener`，代码如下：
+
+```Java
+package com.itheima.consumer.listener;
+
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.stereotype.Component;
+
+@Component
+public class SpringRabbitListener {
+        // 利用RabbitListener来声明要监听的队列信息
+    // 将来一旦监听的队列中有了消息，就会推送给当前服务，调用当前方法，处理消息。
+    // 可以看到方法体中接收的就是消息体的内容
+    @RabbitListener(queues = "simple.queue")
+    public void listenSimpleQueueMessage(String msg) throws InterruptedException {
+        System.out.println("spring 消费者接收到消息：【" + msg + "】");
+    }
+}
+```
+
+
+
+#### WorkQueues模型
+
+Work queues，任务模型。简单来说就是**让****多个消费者****绑定到一个队列，共同消费队列中的消息**。
+
+暂时无法在飞书文档外展示此内容
+
+当消息处理比较耗时的时候，可能生产消息的速度会远远大于消息的消费速度。长此以往，消息就会堆积越来越多，无法及时处理。
+
+此时就可以使用work 模型，**多个消费者共同处理消息处理，消息处理的速度就能大大提高**了。
+
+
+
+但是默认的配置有如下问题：
+
+消息是平均分配给每个消费者，并没有考虑到消费者的处理能力。导致1个消费者空闲，另一个消费者忙的不可开交。没有充分利用每一个消费者的能力，最终消息处理的耗时很长。这样显然是有问题的。
+
+
+
+在spring中有一个简单的配置，可以解决这个问题。修改consumer服务的application.yml文件，添加配置：
+
+```YAML
+spring:
+  rabbitmq:
+    listener:
+      simple:
+        prefetch: 1 # 每次只能获取一条消息，处理完成才能获取下一个消息
+```
+
+
+
+Work模型的使用：
+
+- 多个消费者绑定到一个队列，同一条消息只会被一个消费者处理
+- 通过设置prefetch来控制消费者预取的消息数量
+
+
+
+#### 交换机类型
+
+引入交换机，消息发送的模式会有很大变化：
+
+![image-20240727222422414](./assets/image-20240727222422414.png)
+
+可以看到，在订阅模型中，多了一个exchange角色，而且过程略有变化：
+
+- **Publisher**：生产者，不再发送消息到队列中，而是发给交换机
+- **Exchange**：交换机，一方面，接收生产者发送的消息。另一方面，知道如何处理消息，例如递交给某个特别队列、递交给所有队列、或是将消息丢弃。到底如何操作，取决于Exchange的类型。
+- **Queue**：消息队列也与以前一样，接收消息、缓存消息。不过队列一定要与交换机绑定。
+- **Consumer**：消费者，与以前一样，订阅队列，没有变化
+
+**Exchange（****交换机****）只负责转发消息，不具备存储消息的能力**，因此如果没有任何队列与Exchange绑定，或者没有符合路由规则的队列，那么消息会丢失！
+
+交换机的类型有四种：
+
+- **Fanout**：广播，将消息交给所有绑定到交换机的队列。我们最早在控制台使用的正是Fanout交换机
+- **Direct**：订阅，基于RoutingKey（路由key）发送给订阅了消息的队列
+- **Topic**：通配符订阅，与Direct类似，只不过RoutingKey可以使用通配符
+- **Headers**：头匹配，基于MQ的消息头匹配，用的较少。
+
+
+
+#### Fanout交换机
+
+Fanout可以理解为广播。
+
+
+
+在广播模式下，消息发送流程是这样的：
+
+![img](./assets/1722090338515-4.png)
+
+- 1）  可以有多个队列
+- 2）  每个队列都要绑定到Exchange（交换机）
+- 3）  生产者发送的消息，只能发送到交换机
+- 4）  交换机把消息发送给绑定过的所有队列
+- 5）  订阅队列的消费者都能拿到消息
+
+
+
+交换机的作用如下：
+
+- 接收publisher发送的消息
+- 将消息按照规则路由到与之绑定的队列
+- 不能缓存消息，路由失败，消息丢失
+- FanoutExchange的会将消息路由到每个绑定的队列
+
+
+
+#### Direct交换机
+
+在Fanout模式中，一条消息，会被所有订阅的队列都消费。但是，在某些场景下，我们希望不同的消息被不同的队列消费。这时就要用到Direct类型的Exchange。
+
+![img](./assets/1722090863994-7.png)
+
+在Direct模型下：
+
+- 队列与交换机的绑定，不能是任意绑定了，而是要指定一个`RoutingKey`（路由key）
+- 消息的发送方在 向 Exchange发送消息时，也必须指定消息的 `RoutingKey`。
+- Exchange不再把消息交给每一个绑定的队列，而是根据消息的`Routing Key`进行判断，只有队列的`Routingkey`与消息的 `Routing key`完全一致，才会接收到消息
+
+
+
+描述下Direct交换机与Fanout交换机的差异：
+
+- Fanout交换机将消息路由给每一个与之绑定的队列
+- Direct交换机根据RoutingKey判断路由给哪个队列
+- 如果多个队列具有相同的RoutingKey，则与Fanout功能类似
+
+
+
+#### Topic交换机
+
+`Topic`类型的`Exchange`与`Direct`相比，都是可以根据`RoutingKey`把消息路由到不同的队列。
+
+只不过`Topic`类型`Exchange`可以让队列在绑定`BindingKey` 的时候使用通配符！
+
+```
+BindingKey` 一般都是有一个或多个单词组成，多个单词之间以`.`分割，例如： `item.insert
+```
+
+通配符规则：
+
+- `#`：匹配一个或多个词
+- `*`：匹配不多不少恰好1个词
+
+
+
+描述下Direct交换机与Topic交换机的差异：
+
+- Topic交换机接收的消息RoutingKey必须是多个单词，以 **`.`** 分割
+- Topic交换机与队列绑定时的bindingKey可以指定通配符
+- `#`：代表0个或多个词
+- `*`：代表1个词

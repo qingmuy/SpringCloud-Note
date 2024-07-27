@@ -1,0 +1,11 @@
+server:
+  port: 8082
+feign:
+  okhttp:
+    enabled: true # 开启OKHttp连接池支持
+muy:
+  swagger:
+    title: 购物车服务接口文档
+    package: com.qingmuy.cart.controller
+  database:
+    name: hm-cart
