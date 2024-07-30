@@ -1535,3 +1535,107 @@ BindingKey` 一般都是有一个或多个单词组成，多个单词之间以`.
 - Topic交换机与队列绑定时的bindingKey可以指定通配符
 - `#`：代表0个或多个词
 - `*`：代表1个词
+
+
+
+#### 声明式交换机
+
+个人手动在控制台创建交换机、队列和绑定关系往往是容易出错的，所以应该在程序中声明相应的实体和关系。
+
+
+
+##### 基本API
+
+SpringAMQP提供了一个Queue类，用来创建队列：
+
+![img](./assets/1722330495431-2.png)
+
+SpringAMQP还提供了一个Exchange接口，来表示所有不同类型的交换机：
+
+![img](./assets/1722330495431-1.png)
+
+SpringAMQP还提供了ExchangeBuilder来简化这个过程
+
+![img](./assets/1722330521896-7.png)
+
+而在绑定队列和交换机时，则需要使用BindingBuilder来创建Binding对象：
+
+![img](./assets/1722330534076-10.png)
+
+
+
+##### 基于注解声明
+
+上述使用基本API并使用@Bean注解的方式声明队列和交换机十分繁琐，可以通过基于注解方式来声明。
+
+使用格式为：
+
+```java
+@RabbitListener(bindings = @QueueBinding(
+    value = @Queue(name = "direct.queue1"),
+    exchange = @Exchange(name = "hmall.direct", type = ExchangeTypes.DIRECT),
+    key = {"red", "blue"}
+))
+```
+
+
+
+#### 消息转换器
+
+Spring的消息发送代码接收的消息体是一个Object：
+
+![img](./assets/1722331680464-13.png)
+
+而在数据传输时，它会把你发送的消息序列化为字节发送给MQ，接收消息的时候，还会把字节反序列化为Java对象。
+
+只不过，默认情况下Spring采用的序列化方式是JDK序列化。众所周知，JDK序列化存在下列问题：
+
+- 数据体积过大
+- 有安全漏洞
+- 可读性差
+
+
+
+##### 配置JSON转换器
+
+所以JDK序列化方式并不合适。应当使消息体的体积更小、可读性更高，因此可以使用JSON方式来做序列化和反序列化。
+
+
+
+在消息发送方和接收方都引入依赖：
+
+```XML
+<dependency>
+    <groupId>com.fasterxml.jackson.dataformat</groupId>
+    <artifactId>jackson-dataformat-xml</artifactId>
+    <version>2.9.10</version>
+</dependency>
+```
+
+
+
+配置消息转换器，在`publisher`和`consumer`两个服务的启动类中添加一个Bean即可：
+
+```Java
+@Bean
+public MessageConverter messageConverter(){
+    // 1.定义消息转换器
+    Jackson2JsonMessageConverter jackson2JsonMessageConverter = new Jackson2JsonMessageConverter();
+    // 2.配置自动创建消息id，用于识别不同消息，也可以在业务中基于ID判断是否是重复消息
+    jackson2JsonMessageConverter.setCreateMessageIds(true);
+    return jackson2JsonMessageConverter;
+}
+```
+
+消息转换器中添加的messageId可以便于我们将来做幂等性判断。
+
+
+
+##### 消费者接收Object
+
+消息的接收方接收消息时，要使用与发送方相同的格式接收。
+
+消息接收时，需要使用`@RabbitListener`注解监听指定队列。
+
+
+
