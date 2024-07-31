@@ -1639,3 +1639,463 @@ public MessageConverter messageConverter(){
 
 
 
+## Elasticsearch
+
+
+
+### 基础
+
+#### 安装
+
+Elasticsearch是由elastic公司开发的一套搜索引擎技术，它是elastic技术栈中的一部分。完整的技术栈包括：
+
+- Elasticsearch：用于数据存储、计算和搜索
+- Logstash/Beats：用于数据收集
+- Kibana：用于数据可视化
+
+整套技术栈的核心就是用来**存储**、**搜索**、**计算**的Elasticsearch，因此我们接下来学习的核心也是Elasticsearch。
+
+
+
+Elasticsearch对外提供的是Restful风格的API，任何操作都可以通过发送http请求来完成。不过http请求的方式、路径、还有请求参数的格式都有严格的规范。这些规范我们肯定记不住，因此我们要借助于Kibana这个服务。
+
+Kibana是elastic公司提供的用于操作Elasticsearch的可视化控制台。它的功能非常强大，包括：
+
+- 对Elasticsearch数据的搜索、展示
+- 对Elasticsearch数据的统计、聚合，并形成图形化报表、图形
+- 对Elasticsearch的集群状态监控
+- 它还提供了一个开发控制台（DevTools），在其中对Elasticsearch的Restful的API接口提供了**语法提示**
+
+
+
+##### 安装elasticsearch
+
+这里的内存最小要分配512M，否则容易崩溃。
+
+```Bash
+docker run -d \
+  --name es \
+  -e "ES_JAVA_OPTS=-Xms512m -Xmx512m" \
+  -e "discovery.type=single-node" \
+  -v es-data:/usr/share/elasticsearch/data \
+  -v es-plugins:/usr/share/elasticsearch/plugins \
+  --privileged \
+  --network netName \
+  -p 9200:9200 \
+  -p 9300:9300 \
+  elasticsearch:7.12.1
+```
+
+注意：目前市面上使用的主要还是6.x-7.x的版本。
+
+
+
+##### 安装KiBana
+
+```Bash
+docker run -d \
+--name kibana \
+-e ELASTICSEARCH_HOSTS=http://es:9200 \
+--network=netName \
+-p 5601:5601  \
+kibana:7.12.1
+```
+
+
+
+### 倒排索引
+
+基于倒排索引技术，elasticsearch有很好的性能。
+
+
+
+#### 正排索引
+
+当有id精确匹配时，正排索引可以很快的查询到数据，如果是模糊的查询，则全表扫描。也就是说**正向索引适合根据索引字段的精确搜索**。
+
+
+
+#### 倒排索引
+
+倒排索引中有两个非常重要的概念：
+
+- 文档（`Document`）：用来搜索的数据，其中的每一条数据就是一个文档。例如一个网页、一个商品信息
+- 词条（`Term`）：对文档数据或用户搜索数据，利用某种算法分词，得到的具备含义的词语就是词条。例如：我是中国人，就可以分为：我、是、中国人、中国、国人这样的几个词条
+
+**创建倒排索引**是对正向索引的一种特殊处理和应用，流程如下：
+
+- 将每一个文档的数据利用**分词算法**根据语义拆分，得到一个个词条
+- 创建表，每行数据包括词条、词条所在文档id、位置等信息
+- 因为词条唯一性，可以给词条创建**正向**索引
+
+此时形成的这张以词条为索引的表，就是倒排索引表，两者对比如下：
+
+**正向索引**
+
+| **id（索引）** | **title**      | **price** |
+| :------------- | :------------- | :-------- |
+| 1              | 小米手机       | 3499      |
+| 2              | 华为手机       | 4999      |
+| 3              | 华为小米充电器 | 49        |
+| 4              | 小米手环       | 49        |
+| ...            | ...            | ...       |
+
+**倒排索引**
+
+| **词条（索引）** | **文档id** |
+| :--------------- | :--------- |
+| 小米             | 1，3，4    |
+| 手机             | 1，2       |
+| 华为             | 2，3       |
+| 充电器           | 3          |
+| 手环             | 4          |
+
+倒排索引的**搜索流程**如下（以搜索"华为手机"为例），如图：
+
+![img](./assets/1722435911725-1.jpeg)
+
+流程描述：
+
+1）用户输入条件`"华为手机"`进行搜索。
+
+2）对用户输入条件**分词**，得到词条：`华为`、`手机`。
+
+3）拿着词条在倒排索引中查找（**由于词条有索引，查询效率很高**），即可得到包含词条的文档id：`1、2、3`。
+
+4）拿着文档`id`到正向索引中查找具体文档即可（由于`id`也有索引，查询效率也很高）。
+
+虽然要先查询倒排索引，再查询倒排索引，但是无论是词条、还是文档id都建立了索引，查询速度非常快！无需全表扫描。
+
+
+
+#### 正向和倒排
+
+那么为什么一个叫做正向索引，一个叫做倒排索引呢？
+
+-  **正向索引**是最传统的，根据id索引的方式。但根据词条查询时，必须先逐条获取每个文档，然后判断文档中是否包含所需要的词条，是**根据文档找词条的过程**。 
+-  而**倒排索引**则相反，是先找到用户要搜索的词条，根据词条得到保护词条的文档的id，然后根据id获取文档。是**根据词条找文档的过程**。 
+
+
+
+**正向索引**：
+
+- 优点： 
+  - 可以给多个字段创建索引
+  - 根据索引字段搜索、排序速度非常快
+- 缺点： 
+  - 根据非索引字段，或者索引字段中的部分词条查找时，只能全表扫描。
+
+**倒排索引**：
+
+- 优点： 
+  - 根据词条搜索、模糊搜索时，速度非常快
+- 缺点： 
+  - 只能给词条创建索引，而不是字段
+  - 无法根据字段做排序
+
+
+
+#### 概念
+
+elasticsearch中有很多独有的概念，与mysql中略有差别，但也有相似之处。
+
+
+
+##### 文档和字段
+
+elasticsearch是面向**文档（Document）**存储的，可以是数据库中的一条商品数据，一个订单信息。文档数据会被序列化为`json`格式后存储在`elasticsearch`中：
+
+![img](./assets/1722436137356-4.png)
+
+```JSON
+{
+    "id": 1,
+    "title": "小米手机",
+    "price": 3499
+}
+{
+    "id": 2,
+    "title": "华为手机",
+    "price": 4999
+}
+{
+    "id": 3,
+    "title": "华为小米充电器",
+    "price": 49
+}
+{
+    "id": 4,
+    "title": "小米手环",
+    "price": 299
+}
+```
+
+因此，原本数据库中的一行数据就是ES中的一个JSON文档；而数据库中每行数据都包含很多列，这些列就转换为JSON文档中的**字段（Field）**。
+
+
+
+##### 索引和映射
+
+随着业务发展，需要在es中存储的文档也会越来越多，比如有商品的文档、用户的文档、订单文档等等：
+
+![img](./assets/1722436137356-5.png)
+
+所有文档都散乱存放显然非常混乱，也不方便管理。
+
+因此，我们要将类型相同的文档集中在一起管理，称为**索引（Index）**。例如：
+
+**商品索引**
+
+```JSON
+{
+    "id": 1,
+    "title": "小米手机",
+    "price": 3499
+}
+
+{
+    "id": 2,
+    "title": "华为手机",
+    "price": 4999
+}
+
+{
+    "id": 3,
+    "title": "三星手机",
+    "price": 3999
+}
+```
+
+**用户索引**
+
+```JSON
+{
+    "id": 101,
+    "name": "张三",
+    "age": 21
+}
+
+{
+    "id": 102,
+    "name": "李四",
+    "age": 24
+}
+
+{
+    "id": 103,
+    "name": "麻子",
+    "age": 18
+}
+```
+
+**订单索引**
+
+```JSON
+{
+    "id": 10,
+    "userId": 101,
+    "goodsId": 1,
+    "totalFee": 294
+}
+
+{
+    "id": 11,
+    "userId": 102,
+    "goodsId": 2,
+    "totalFee": 328
+}
+```
+
+- 所有用户文档，就可以组织在一起，称为用户的索引；
+- 所有商品的文档，可以组织在一起，称为商品的索引；
+- 所有订单的文档，可以组织在一起，称为订单的索引；
+
+因此，我们可以把索引当做是数据库中的表。
+
+数据库的表会有约束信息，用来定义表的结构、字段的名称、类型等信息。因此，索引库中就有**映射（mapping）**，是索引中文档的字段约束信息，类似表的结构约束。
+
+
+
+##### mysql与elasticsearch
+
+我们统一的把mysql与elasticsearch的概念做一下对比：
+
+| **MySQL** | **Elasticsearch** | **说明**                                                     |
+| :-------- | :---------------- | :----------------------------------------------------------- |
+| Table     | Index             | 索引(index)，就是文档的集合，类似数据库的表(table)           |
+| Row       | Document          | 文档（Document），就是一条条的数据，类似数据库中的行（Row），文档都是JSON格式 |
+| Column    | Field             | 字段（Field），就是JSON文档中的字段，类似数据库中的列（Column） |
+| Schema    | Mapping           | Mapping（映射）是索引中文档的约束，例如字段类型约束。类似数据库的表结构（Schema） |
+| SQL       | DSL               | DSL是elasticsearch提供的JSON风格的请求语句，用来操作elasticsearch，实现CRUD |
+
+如图：
+
+![img](./assets/1722436137356-6.png)
+
+那是不是说，我们学习了elasticsearch就不再需要mysql了呢？
+
+并不是如此，两者各自有自己的擅长之处：
+
+-  Mysql：擅长事务类型操作，可以确保数据的安全和一致性 
+-  Elasticsearch：擅长海量数据的搜索、分析、计算 
+
+因此在企业中，往往是两者结合使用：
+
+- 对安全性要求较高的写操作，使用mysql实现
+- 对查询性能要求较高的搜索需求，使用elasticsearch实现
+- 两者再基于某种方式，实现数据的同步，保证一致性
+
+![img](./assets/1722436137356-7.png)
+
+
+
+### IK分词器
+
+Elasticsearch的关键就是倒排索引，而倒排索引依赖于对文档内容的分词，而分词则需要高效、精准的分词算法，IK分词器就是这样一个中文分词算法。
+
+
+
+#### 安装
+
+**方案一**：在线安装
+
+运行一个命令即可：
+
+```Shell
+docker exec -it es ./bin/elasticsearch-plugin  install https://github.com/medcl/elasticsearch-analysis-ik/releases/download/v7.12.1/elasticsearch-analysis-ik-7.12.1.zip
+```
+
+然后重启es容器：
+
+```Shell
+docker restart es
+```
+
+**方案二**：离线安装
+
+如果网速较差，也可以选择离线安装。
+
+首先，查看之前安装的Elasticsearch容器的plugins数据卷目录：
+
+```Shell
+docker volume inspect es-plugins
+```
+
+结果如下：
+
+```JSON
+[
+    {
+        "CreatedAt": "2024-11-06T10:06:34+08:00",
+        "Driver": "local",
+        "Labels": null,
+        "Mountpoint": "/var/lib/docker/volumes/es-plugins/_data",
+        "Name": "es-plugins",
+        "Options": null,
+        "Scope": "local"
+    }
+]
+```
+
+可以看到elasticsearch的插件挂载到了`/var/lib/docker/volumes/es-plugins/_data`这个目录。我们需要把IK分词器上传至这个目录。
+
+找到本地的ik分词器插件，解压后上传至虚拟机的`/var/lib/docker/volumes/es-plugins/_data`这个目录：
+
+![img](./assets/1722436209899-17.png)
+
+最后，重启es容器：
+
+```Shell
+docker restart es
+```
+
+
+
+#### 使用
+
+IK分词器包含两种模式：
+
+-  `ik_smart`：智能语义切分 
+-  `ik_max_word`：最细粒度切分 
+
+
+
+如果使用IK分词器，则需要在请求中声明分词器：
+
+```JSON
+POST /_analyze
+{
+  "analyzer": "ik_smart",
+  "text": "这是一个测试"
+}
+```
+
+结果如下：
+
+```json
+{
+  "tokens" : [
+    {
+      "token" : "这是",
+      "start_offset" : 0,
+      "end_offset" : 2,
+      "type" : "CN_WORD",
+      "position" : 0
+    },
+    {
+      "token" : "一个",
+      "start_offset" : 2,
+      "end_offset" : 4,
+      "type" : "CN_WORD",
+      "position" : 1
+    },
+    {
+      "token" : "测试",
+      "start_offset" : 4,
+      "end_offset" : 6,
+      "type" : "CN_WORD",
+      "position" : 2
+    }
+  ]
+}
+```
+
+
+
+#### 拓展词典
+
+现代社会文化每天都在产生新的词汇，与时俱进需要更新IK分词器的词库。
+
+1）打开IK分词器config目录：
+
+![img](./assets/1722436560945-22.png)
+
+**注意，如果采用在线安装的通过，默认是没有config目录的。需要自己创建config文件。**
+
+2）在IKAnalyzer.cfg.xml配置文件内容添加：
+
+```XML
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<properties>
+        <comment>IK Analyzer 扩展配置</comment>
+        <!--用户可以在这里配置自己的扩展字典 *** 添加扩展词典-->
+        <entry key="ext_dict">ext.dic</entry>
+</properties>
+```
+
+3）在IK分词器的config目录新建一个 `ext.dic`，可以参考config目录下复制一个配置文件进行修改
+
+```Plain
+传智播客
+泰裤辣
+```
+
+4）重启elasticsearch
+
+```Shell
+docker restart es
+
+# 查看 日志
+docker logs -f elasticsearch
+```

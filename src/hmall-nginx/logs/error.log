@@ -1,0 +1,2 @@
+2024/07/30 19:54:43 [error] 25764#17220: *38 connect() failed (10061: No connection could be made because the target machine actively refused it) while connecting to upstream, client: 127.0.0.1, server: localhost, request: "GET /api/carts HTTP/1.1", upstream: "http://127.0.0.1:8080/carts", host: "localhost:18080", referrer: "http://localhost:18080/cart.html"
+2024/07/30 22:22:50 [notice] 20840#29388: signal process started
