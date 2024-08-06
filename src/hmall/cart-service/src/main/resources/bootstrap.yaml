@@ -12,3 +12,4 @@ spring:
           - dataId: Jdbc.yaml # 共享mybatis配置
           - dataId: Log.yaml # 共享日志配置
           - dataId: Swagger.yaml # 共享日志配置
+          - data-id: RabbitMq.yaml # 共享rabbitMQ配置

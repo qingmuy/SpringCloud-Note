@@ -1703,19 +1703,19 @@ kibana:7.12.1
 
 
 
-### 倒排索引
+#### 倒排索引
 
 基于倒排索引技术，elasticsearch有很好的性能。
 
 
 
-#### 正排索引
+##### 正排索引
 
 当有id精确匹配时，正排索引可以很快的查询到数据，如果是模糊的查询，则全表扫描。也就是说**正向索引适合根据索引字段的精确搜索**。
 
 
 
-#### 倒排索引
+##### 倒排索引
 
 倒排索引中有两个非常重要的概念：
 
@@ -1768,7 +1768,7 @@ kibana:7.12.1
 
 
 
-#### 正向和倒排
+##### 正向和倒排
 
 那么为什么一个叫做正向索引，一个叫做倒排索引呢？
 
@@ -1949,13 +1949,13 @@ elasticsearch是面向**文档（Document）**存储的，可以是数据库中�
 
 
 
-### IK分词器
+#### IK分词器
 
 Elasticsearch的关键就是倒排索引，而倒排索引依赖于对文档内容的分词，而分词则需要高效、精准的分词算法，IK分词器就是这样一个中文分词算法。
 
 
 
-#### 安装
+##### 安装
 
 **方案一**：在线安装
 
@@ -2011,7 +2011,7 @@ docker restart es
 
 
 
-#### 使用
+##### 使用
 
 IK分词器包含两种模式：
 
@@ -2062,7 +2062,7 @@ POST /_analyze
 
 
 
-#### 拓展词典
+##### 拓展词典
 
 现代社会文化每天都在产生新的词汇，与时俱进需要更新IK分词器的词库。
 
@@ -2099,3 +2099,502 @@ docker restart es
 # 查看 日志
 docker logs -f elasticsearch
 ```
+
+
+
+### 索引库操作
+
+Index就类似数据库表，Mapping映射就类似表的结构。我们要向es中存储数据，必须先创建Index和Mapping
+
+
+
+#### Mapping映射属性
+
+Mapping是对索引库中文档的约束，常见的Mapping属性包括：
+
+- `type`：字段数据类型，常见的简单类型有： 
+  - 字符串：`text`（可分词的文本）、`keyword`（精确值，例如：品牌、国家、ip地址）
+  - 数值：`long`、`integer`、`short`、`byte`、`double`、`float`、
+  - 布尔：`boolean`
+  - 日期：`date`
+  - 对象：`object`
+- `index`：是否创建索引，默认为`true`
+- `analyzer`：使用哪种分词器
+- `properties`：该字段的子字段
+
+例如下面的json文档：
+
+```JSON
+{
+    "age": 21,
+    "weight": 52.1,
+    "isMarried": false,
+    "info": "黑马程序员Java讲师",
+    "email": "zy@itcast.cn",
+    "score": [99.1, 99.5, 98.9],
+    "name": {
+        "firstName": "云",
+        "lastName": "赵"
+    }
+}
+```
+
+对应的每个字段映射（Mapping）：
+
+| **字段名** | **字段类型** | **类型说明**       | **是否****参与搜索** | **是否****参与分词** | **分词器** |      |
+| :--------- | :----------- | :----------------- | :------------------- | :------------------- | :--------- | ---- |
+| age        | `integer`    | 整数               |                      |                      | ——         |      |
+| weight     | `float`      | 浮点数             |                      |                      | ——         |      |
+| isMarried  | `boolean`    | 布尔               |                      |                      | ——         |      |
+| info       | `text`       | 字符串，但需要分词 |                      |                      | IK         |      |
+| email      | `keyword`    | 字符串，但是不分词 |                      |                      | ——         |      |
+| score      | `float`      | 只看数组中元素类型 |                      |                      | ——         |      |
+| name       | firstName    | `keyword`          | 字符串，但是不分词   |                      |            | ——   |
+| lastName   | `keyword`    | 字符串，但是不分词 |                      |                      | ——         |      |
+
+
+
+#### 索引库CRUD
+
+由于Elasticsearch采用的是Restful风格的API，因此其请求方式和路径相对都比较规范，而且请求参数也都采用JSON风格。
+
+基于Kibana的DevTools来编写请求做测试，由于有语法提示，会非常方便。
+
+
+
+##### 创建索引库和映射
+
+**基本语法**：
+
+- 请求方式：`PUT`
+- 请求路径：`/索引库名`，可以自定义
+- 请求参数：`mapping`映射
+
+**格式**：
+
+```JSON
+PUT /索引库名称
+{
+  "mappings": {
+    "properties": {
+      "字段名":{
+        "type": "text",
+        "analyzer": "ik_smart"
+      },
+      "字段名2":{
+        "type": "keyword",
+        "index": "false"
+      },
+      "字段名3":{
+        "properties": {
+          "子字段": {
+            "type": "keyword"
+          }
+        }
+      },
+      // ...略
+    }
+  }
+}
+```
+
+**示例**：
+
+```JSON
+# PUT /heima
+{
+  "mappings": {
+    "properties": {
+      "info":{
+        "type": "text",
+        "analyzer": "ik_smart"
+      },
+      "email":{
+        "type": "keyword",
+        "index": "false"
+      },
+      "name":{
+        "properties": {
+          "firstName": {
+            "type": "keyword"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+
+
+##### 查询索引库
+
+**基本语法**：
+
+-  请求方式：GET 
+-  请求路径：/索引库名 
+-  请求参数：无 
+
+**格式**：
+
+```Plain
+GET /索引库名
+```
+
+**示例**：
+
+```Plain
+GET /heima
+```
+
+
+
+##### 修改索引库
+
+倒排索引结构虽然不复杂，但是一旦数据结构改变（比如改变了分词器），就需要重新创建倒排索引，这简直是灾难。因此索引库**一旦创建，无法修改mapping**。
+
+虽然无法修改mapping中已有的字段，但是却允许添加新的字段到mapping中，因为不会对倒排索引产生影响。因此修改索引库能做的就是向索引库中添加新字段，或者更新索引库的基础属性。
+
+**语法说明**：
+
+```JSON
+PUT /索引库名/_mapping
+{
+  "properties": {
+    "新字段名":{
+      "type": "integer"
+    }
+  }
+}
+```
+
+**示例**：
+
+```JSON
+PUT /heima/_mapping
+{
+  "properties": {
+    "age":{
+      "type": "integer"
+    }
+  }
+}
+```
+
+
+
+##### 删除索引库
+
+**语法：**
+
+-  请求方式：DELETE 
+-  请求路径：/索引库名 
+-  请求参数：无 
+
+**格式：**
+
+```Plain
+DELETE /索引库名
+```
+
+示例：
+
+```Plain
+DELETE /heima
+```
+
+
+
+##### 总结
+
+- 创建索引库：PUT /索引库名
+- 查询索引库：GET /索引库名
+- 删除索引库：DELETE /索引库名
+- 修改索引库，添加字段：PUT /索引库名/_mapping
+
+
+
+### 文档操作
+
+有了索引库，接下来就可以向索引库中添加数据了。
+
+Elasticsearch中的数据其实就是JSON风格的文档。操作文档也有`增`、`删`、`改`、`查`等几种常见操作。
+
+
+
+#### 新增文档
+
+**语法：**
+
+```JSON
+POST /索引库名/_doc/文档id
+{
+    "字段1": "值1",
+    "字段2": "值2",
+    "字段3": {
+        "子属性1": "值3",
+        "子属性2": "值4"
+    },
+}
+```
+
+**示例：**
+
+```JSON
+POST /heima/_doc/1
+{
+    "info": "黑马程序员Java讲师",
+    "email": "zy@itcast.cn",
+    "name": {
+        "firstName": "云",
+        "lastName": "赵"
+    }
+}
+```
+
+**响应：**
+
+![img](./assets/1722524955269-6.png)
+
+
+
+#### 查询文档
+
+根据rest风格，新增是post，查询应该是get，不过查询一般都需要条件，这里我们把文档id带上。
+
+**语法：**
+
+```JSON
+GET /{索引库名称}/_doc/{id}
+```
+
+**示例：**
+
+```JavaScript
+GET /heima/_doc/1
+```
+
+**查看结果：**
+
+![img](./assets/1722524955262-1.png)
+
+
+
+#### 删除文档
+
+删除使用DELETE请求，同样，需要根据id进行删除：
+
+**语法：**
+
+```JavaScript
+DELETE /{索引库名}/_doc/id值
+```
+
+**示例：**
+
+```JSON
+DELETE /heima/_doc/1
+```
+
+**结果：**
+
+![img](./assets/1722524955263-2.png)
+
+
+
+#### 修改文档
+
+修改有两种方式：
+
+- 全量修改：直接覆盖原来的文档
+- 局部修改：修改文档中的部分字段
+
+
+
+##### 全量修改
+
+全量修改是覆盖原来的文档，其本质是两步操作：
+
+- 根据指定的id删除文档
+- 新增一个相同id的文档
+
+**注意**：如果根据id删除时，id不存在，第二步的新增也会执行，也就从修改变成了新增操作了。
+
+**语法：**
+
+```JSON
+PUT /{索引库名}/_doc/文档id
+{
+    "字段1": "值1",
+    "字段2": "值2",
+    // ... 略
+}
+```
+
+**示例：**
+
+```JSON
+PUT /heima/_doc/1
+{
+    "info": "黑马程序员高级Java讲师",
+    "email": "zy@itcast.cn",
+    "name": {
+        "firstName": "云",
+        "lastName": "赵"
+    }
+}
+```
+
+由于`id`为`1`的文档已经被删除，所以第一次执行时，得到的反馈是`created`：
+
+![img](./assets/1722524955263-3.png)
+
+所以如果执行第2次时，得到的反馈则是`updated`：
+
+![img](./assets/1722524955263-4.png)
+
+
+
+##### 局部修改
+
+局部修改是只修改指定id匹配的文档中的部分字段。
+
+**语法：**
+
+```JSON
+POST /{索引库名}/_update/文档id
+{
+    "doc": {
+         "字段名": "新的值",
+    }
+}
+```
+
+**示例：**
+
+```JSON
+POST /heima/_update/1
+{
+  "doc": {
+    "email": "ZhaoYun@itcast.cn"
+  }
+}
+```
+
+**执行结果**：
+
+![img](./assets/1722524955263-5.png)
+
+
+
+#### 批处理
+
+批处理采用POST请求，基本语法如下：
+
+```Java
+POST _bulk
+{ "index" : { "_index" : "test", "_id" : "1" } }
+{ "field1" : "value1" }
+{ "delete" : { "_index" : "test", "_id" : "2" } }
+{ "create" : { "_index" : "test", "_id" : "3" } }
+{ "field1" : "value3" }
+{ "update" : {"_id" : "1", "_index" : "test"} }
+{ "doc" : {"field2" : "value2"} }
+```
+
+其中：
+
+- `index`代表新增操作
+  - `_index`：指定索引库名
+  - `_id`指定要操作的文档id
+  - `{ "field1" : "value1" }`：则是要新增的文档内容
+- `delete`代表删除操作
+  - `_index`：指定索引库名
+  - `_id`指定要操作的文档id
+- `update`代表更新操作
+  - `_index`：指定索引库名
+  - `_id`指定要操作的文档id
+  - `{ "doc" : {"field2" : "value2"} }`：要更新的文档字段
+
+示例，批量新增：
+
+```Java
+POST /_bulk
+{"index": {"_index":"heima", "_id": "3"}}
+{"info": "黑马程序员C++讲师", "email": "ww@itcast.cn", "name":{"firstName": "五", "lastName":"王"}}
+{"index": {"_index":"heima", "_id": "4"}}
+{"info": "黑马程序员前端讲师", "email": "zhangsan@itcast.cn", "name":{"firstName": "三", "lastName":"张"}}
+```
+
+批量删除：
+
+```Java
+POST /_bulk
+{"delete":{"_index":"heima", "_id": "3"}}
+{"delete":{"_index":"heima", "_id": "4"}}
+```
+
+
+
+#### 总结
+
+文档操作有哪些？
+
+- 创建文档：`POST /{索引库名}/_doc/文档id   { json文档 }`
+- 查询文档：`GET /{索引库名}/_doc/文档id`
+- 删除文档：`DELETE /{索引库名}/_doc/文档id`
+- 修改文档： 
+  - 全量修改：`PUT /{索引库名}/_doc/文档id { json文档 }`
+  - 局部修改：`POST /{索引库名}/_update/文档id { "doc": {字段}}`
+
+
+
+### RestAPI
+
+ES官方提供了各种不同语言的客户端，用来操作ES。这些客户端的本质就是组装DSL语句，通过http请求发送给ES。
+
+官方文档地址：
+
+https://www.elastic.co/guide/en/elasticsearch/client/index.html
+
+
+
+#### 初始化RestClient
+
+在elasticsearch提供的API中，与elasticsearch一切交互都封装在一个名为`RestHighLevelClient`的类中，必须先完成这个对象的初始化，建立与elasticsearch的连接。
+
+
+
+分为三步：
+
+1）在对应模块中引入`es`的`RestHighLevelClient`依赖：
+
+```XML
+<dependency>
+    <groupId>org.elasticsearch.client</groupId>
+    <artifactId>elasticsearch-rest-high-level-client</artifactId>
+</dependency>
+```
+
+2）因为SpringBoot默认的ES版本是`7.17.10`，要根据对应的ES版本做出修改：
+
+```XML
+  <properties>
+      <maven.compiler.source>11</maven.compiler.source>
+      <maven.compiler.target>11</maven.compiler.target>
+      <elasticsearch.version>7.12.1</elasticsearch.version>
+  </properties>
+```
+
+3）初始化RestHighLevelClient：
+
+初始化的代码如下：
+
+```Java
+RestHighLevelClient client = new RestHighLevelClient(RestClient.builder(
+        HttpHost.create("http:/ip:9200")
+));
+```
+
+
+

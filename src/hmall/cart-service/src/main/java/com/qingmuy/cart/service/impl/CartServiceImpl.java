@@ -2,6 +2,7 @@ package com.qingmuy.cart.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmall.common.exception.BizIllegalException;
@@ -42,6 +43,10 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
 
     private final CartProperties cartProperties;
 
+    /**
+     * 购物车增添商品
+     * @param cartFormDTO 商品信息
+     */
     @Override
     public void addItem2Cart(CartFormDTO cartFormDTO) {
         // 1.获取登录用户
@@ -65,12 +70,14 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
         save(cart);
     }
 
+    /**
+     * 查询购物车内容
+     * @return 购物车内商品列表
+     */
     @Override
     public List<CartVO> queryMyCarts() {
         // 1.查询我的购物车列表
         List<Cart> carts = lambdaQuery().eq(Cart::getUserId, UserContext.getUser()).list();
-        // System.out.println("carts = " + carts);
-        System.out.println("userId = " + UserContext.getUser());
         if (CollUtils.isEmpty(carts)) {
             return CollUtils.emptyList();
         }
@@ -85,6 +92,10 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
         return vos;
     }
 
+    /**
+     *
+     * @param vos
+     */
     private void handleCartItems(List<CartVO> vos) {
         // 1.获取商品id
         Set<Long> itemIds = vos.stream().map(CartVO::getItemId).collect(Collectors.toSet());
@@ -138,6 +149,10 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
         }
     }
 
+    /**
+     * 批量删除购物车内商品
+     * @param itemIds 商品ids
+     */
     @Override
     public void removeByItemIds(Collection<Long> itemIds) {
         // 1.构建删除条件，userId和itemId
@@ -149,6 +164,10 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
         remove(queryWrapper);
     }
 
+    /**
+     * 检查用户购物车是否已经超出阈值
+     * @param userId 用户id
+     */
     private void checkCartsFull(Long userId) {
         Long count = lambdaQuery().eq(Cart::getUserId, userId).count();
         if (count >= cartProperties.getMaxItems()) {
@@ -156,11 +175,32 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
         }
     }
 
+    /**
+     * 检查商品是否存在于用户的购物车
+     * @param itemId 商品id
+     * @param userId 用户id
+     * @return 结果：是否存在
+     */
     private boolean checkItemExists(Long itemId, Long userId) {
         Long count = lambdaQuery()
                 .eq(Cart::getUserId, userId)
                 .eq(Cart::getItemId, itemId)
                 .count();
         return count > 0;
+    }
+
+    /**
+     * 给RabbitMQ使用的删除购物车内商品方法
+     * @param itemIds 商品信息列表
+     * @param UserId 用户id
+     */
+    @Override
+    public void removeCartByItemIds(Set<Long> itemIds, Long UserId) {
+        // 1.构建删除条件，userId和itemId
+        LambdaQueryWrapper<Cart> qw = new LambdaQueryWrapper<>();
+        qw.eq(Cart::getUserId, UserId)
+                .in(Cart::getItemId, itemIds);
+        // 2.删除
+        remove(qw);
     }
 }

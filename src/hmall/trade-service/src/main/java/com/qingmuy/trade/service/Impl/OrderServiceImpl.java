@@ -14,14 +14,12 @@ import com.qingmuy.trade.mapper.OrderMapper;
 import com.qingmuy.trade.service.IOrderDetailService;
 import com.qingmuy.trade.service.IOrderService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -36,12 +34,19 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements IOrderService {
 
+    private final RabbitTemplate rabbitTemplate;
+
     private final IOrderDetailService detailService;
 
     private final ItemClient itemClient;
 
     private final CartClient cartClient;
 
+    /**
+     * 创建订单
+     * @param orderFormDTO 订单信息
+     * @return 订单ID
+     */
     @Override
     @Transactional
     public Long createOrder(OrderFormDTO orderFormDTO) {
@@ -76,7 +81,18 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         detailService.saveBatch(details);
 
         // 3.清理购物车商品
-        cartClient.deleteCartItemByIds(itemIds);
+        // cartClient.deleteCartItemByIds(itemIds);
+        // TODO： 将下单具体商品、当前用户id发送到cart.clear.queue队列
+        // 将购物车商品id与当前用户id封装在一起
+        Map<String, Object> msg = new HashMap<>();
+        msg.put("itemIds", itemIds);
+        msg.put("userId", UserContext.getUser());
+
+        try {
+            rabbitTemplate.convertAndSend("trade.topic", "order.create", msg);
+        } catch (Exception e) {
+            log.error("订单创建的消息发送失败", e);
+        }
 
         // 4.扣减库存
         try {
@@ -87,6 +103,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return order.getId();
     }
 
+    /**
+     * 将订单标注为支付成功
+     * @param orderId
+     */
     @Override
     public void markOrderPaySuccess(Long orderId) {
         Order order = new Order();

@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.qingmuy.cart.domain.dto.CartFormDTO;
 import com.qingmuy.cart.domain.po.Cart;
 import com.qingmuy.cart.domain.vo.CartVO;
+
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 /**
  * <p>
@@ -22,4 +24,6 @@ public interface ICartService extends IService<Cart> {
     List<CartVO> queryMyCarts();
 
     void removeByItemIds(Collection<Long> itemIds);
+
+    void removeCartByItemIds(Set<Long> itemIds, Long UserId);
 }
