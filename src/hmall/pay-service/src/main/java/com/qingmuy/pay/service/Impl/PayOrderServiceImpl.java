@@ -72,6 +72,7 @@ public class PayOrderServiceImpl extends ServiceImpl<PayOrderMapper, PayOrder> i
         order.setStatus(2);
         order.setPayTime(LocalDateTime.now());
         tradeClient.updateById(order);*/
+        // 传递订单id
         try {
             rabbitTemplate.convertAndSend("pay.direct", "pay.success", po.getBizOrderNo());
         } catch (Exception e) {

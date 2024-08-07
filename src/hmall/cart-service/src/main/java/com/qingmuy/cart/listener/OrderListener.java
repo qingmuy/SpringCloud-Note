@@ -8,7 +8,6 @@ import org.springframework.amqp.rabbit.annotation.QueueBinding;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
 import java.util.Set;
 
 @Component
@@ -22,8 +21,8 @@ public class OrderListener {
             exchange = @Exchange(name = "trade.topic", type = "topic"),
             key = "order.create"
     ))
-    public void listenOrder(Map msg) {
-        cartService.removeCartByItemIds((Set<Long>) msg.get("itemIds"), (Long) msg.get("userId"));
+    public void listenOrder(Set<Long> itemIds) {
+        cartService.removeByItemIds(itemIds);
     }
 
 }

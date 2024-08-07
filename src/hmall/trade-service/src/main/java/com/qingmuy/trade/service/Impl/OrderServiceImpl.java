@@ -19,7 +19,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -57,6 +60,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         // 1.2.获取商品id和数量的Map
         Map<Long, Integer> itemNumMap = detailDTOS.stream()
                 .collect(Collectors.toMap(OrderDetailDTO::getItemId, OrderDetailDTO::getNum));
+        // 这里使用Set接值keyset，类型为class java.util.HashMap$KeySet
         Set<Long> itemIds = itemNumMap.keySet();
         // 1.3.查询商品
         List<ItemDTO> items = itemClient.queryItemByIds(itemIds);
@@ -82,14 +86,14 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
         // 3.清理购物车商品
         // cartClient.deleteCartItemByIds(itemIds);
-        // TODO： 将下单具体商品、当前用户id发送到cart.clear.queue队列
         // 将购物车商品id与当前用户id封装在一起
-        Map<String, Object> msg = new HashMap<>();
-        msg.put("itemIds", itemIds);
-        msg.put("userId", UserContext.getUser());
 
         try {
-            rabbitTemplate.convertAndSend("trade.topic", "order.create", msg);
+            // 此处通过修改消息头部，将userId添加到消息头部，接收时，由于消息转换器被重写，所以userid会自动存入userContext
+            rabbitTemplate.convertAndSend("trade.topic", "order.create", itemIds, message -> {
+                message.getMessageProperties().setHeader("userId", UserContext.getUser());
+                return message;
+            });
         } catch (Exception e) {
             log.error("订单创建的消息发送失败", e);
         }
