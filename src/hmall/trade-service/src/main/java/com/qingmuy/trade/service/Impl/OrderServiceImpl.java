@@ -3,7 +3,6 @@ package com.qingmuy.trade.service.Impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmall.common.exception.BadRequestException;
 import com.hmall.common.utils.UserContext;
-import com.qingmuy.api.client.CartClient;
 import com.qingmuy.api.client.ItemClient;
 import com.qingmuy.api.domain.dto.ItemDTO;
 import com.qingmuy.api.domain.dto.OrderDetailDTO;
@@ -43,7 +42,6 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
     private final ItemClient itemClient;
 
-    private final CartClient cartClient;
 
     /**
      * 创建订单
@@ -109,15 +107,31 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
     /**
      * 将订单标注为支付成功
-     * @param orderId
+     * @param orderId 订单id
      */
     @Override
     public void markOrderPaySuccess(Long orderId) {
+        /*// 1.查询订单
+        Order old = getById(orderId);
+        // 2.判断订单状态
+        if (old == null || old.getStatus() != 1) {
+            // 订单不存在或者订单状态不是1，放弃处理
+            return;
+        }
+        // 3.尝试更新订单
         Order order = new Order();
         order.setId(orderId);
         order.setStatus(2);
         order.setPayTime(LocalDateTime.now());
-        updateById(order);
+        updateById(order);*/
+
+        // 判断与更新是两步动作，因此在小概率下可能存在线程安全问题，因此改写如下
+        lambdaUpdate()
+                .set(Order::getStatus, 2)
+                .set(Order::getPayTime, LocalDateTime.now())
+                .eq(Order::getId, orderId)
+                .eq(Order::getStatus, 1)
+                .update();
     }
 
     private List<OrderDetail> buildDetails(Long orderId, List<ItemDTO> items, Map<Long, Integer> numMap) {

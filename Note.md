@@ -1092,7 +1092,7 @@ public void updateConfigInfo(String configInfo){
 
 
 
-## MQ
+# MQ
 
 
 
@@ -1101,13 +1101,13 @@ public void updateConfigInfo(String configInfo){
 
 
 
-### 基础
+## 基础
 
 业务需要实时得到服务提供方的响应，则应该选择同步通讯（同步调用）。而如果追求更高的效率，并且不需要实时响应，则应该选择异步通讯（异步调用）。
 
 
 
-#### 同步调用
+### 同步调用
 
 对于一个业务流程而言，多个微服务之间的调用就是同步通讯，必须等待上一个服务结束后才可以执行，这就导致：
 
@@ -1119,7 +1119,7 @@ public void updateConfigInfo(String configInfo){
 
 
 
-#### 异步调用
+### 异步调用
 
 异步调用方式其实就是基于消息通知的方式，一般包含三个角色：
 
@@ -1149,7 +1149,7 @@ public void updateConfigInfo(String configInfo){
 
 
 
-#### 相关技术
+### 相关技术
 
 消息Broker，目前常见的实现方案就是消息队列（MessageQueue），简称为MQ.
 
@@ -1182,7 +1182,7 @@ public void updateConfigInfo(String configInfo){
 
 
 
-### RabbitMQ
+## RabbitMQ
 
 RabbitMQ是基于Erlang语言开发的开源消息通信中间件，官网地址：
 
@@ -1190,7 +1190,7 @@ https://www.rabbitmq.com/
 
 
 
-#### 安装
+### 安装
 
 基于Docker安装RabbitMQ
 
@@ -1224,29 +1224,29 @@ RabbitMQ对应的架构如图：
 
 
 
-#### 收发消息
+### 收发消息
 
-##### 交换机
+#### 交换机
 
 可以使用交换机给队列发送消息，需要注意的是**交换机没有存储消息的能力**。
 
 
 
-##### 队列
+#### 队列
 
 队列需要与交换机绑定后才能收发消息。
 
 
 
-##### 绑定关系
+#### 绑定关系
 
 点击`Exchanges`选项卡，点击对应交换机，进入交换机详情页，然后点击`Bindings`菜单，在表单中填写要绑定的队列名称，点击`bind`绑定即可。
 
 
 
-#### 数据隔离
+### 数据隔离
 
-##### 用户管理
+#### 用户管理
 
 - `Name`：也就是用户名
 - `Tags`：`administrator`，说明`itheima`用户是超级管理员，拥有所有权限
@@ -1259,15 +1259,15 @@ RabbitMQ对应的架构如图：
 
 
 
-##### virtual host
+#### virtual host
 
 基于`virtual host `实现了隔离效果。
 
 
 
-### SpringAMOP
+## SpringAMOP
 
-#### 导入依赖
+### 导入依赖
 
 ```XML
 <?xml version="1.0" encoding="UTF-8"?>
@@ -1318,11 +1318,11 @@ RabbitMQ对应的架构如图：
 
 
 
-#### 基础使用
+### 基础使用
 
 
 
-##### 消息发送
+#### 消息发送
 
 首先配置MQ地址，在`publisher`服务的`application.yml`中添加配置：
 
@@ -1366,7 +1366,7 @@ public class SpringAmqpTest {
 
 
 
-##### 消息接收
+#### 消息接收
 
 首先配置MQ地址，在`consumer`服务的`application.yml`中添加配置：
 
@@ -1402,7 +1402,7 @@ public class SpringRabbitListener {
 
 
 
-#### WorkQueues模型
+### WorkQueues模型
 
 Work queues，任务模型。简单来说就是**让****多个消费者****绑定到一个队列，共同消费队列中的消息**。
 
@@ -1439,7 +1439,7 @@ Work模型的使用：
 
 
 
-#### 交换机类型
+### 交换机类型
 
 引入交换机，消息发送的模式会有很大变化：
 
@@ -1463,7 +1463,7 @@ Work模型的使用：
 
 
 
-#### Fanout交换机
+### Fanout交换机
 
 Fanout可以理解为广播。
 
@@ -1490,7 +1490,7 @@ Fanout可以理解为广播。
 
 
 
-#### Direct交换机
+### Direct交换机
 
 在Fanout模式中，一条消息，会被所有订阅的队列都消费。但是，在某些场景下，我们希望不同的消息被不同的队列消费。这时就要用到Direct类型的Exchange。
 
@@ -1512,7 +1512,7 @@ Fanout可以理解为广播。
 
 
 
-#### Topic交换机
+### Topic交换机
 
 `Topic`类型的`Exchange`与`Direct`相比，都是可以根据`RoutingKey`把消息路由到不同的队列。
 
@@ -1538,13 +1538,13 @@ BindingKey` 一般都是有一个或多个单词组成，多个单词之间以`.
 
 
 
-#### 声明式交换机
+### 声明式交换机
 
 个人手动在控制台创建交换机、队列和绑定关系往往是容易出错的，所以应该在程序中声明相应的实体和关系。
 
 
 
-##### 基本API
+#### 基本API
 
 SpringAMQP提供了一个Queue类，用来创建队列：
 
@@ -1564,7 +1564,7 @@ SpringAMQP还提供了ExchangeBuilder来简化这个过程
 
 
 
-##### 基于注解声明
+#### 基于注解声明
 
 上述使用基本API并使用@Bean注解的方式声明队列和交换机十分繁琐，可以通过基于注解方式来声明。
 
@@ -1580,7 +1580,7 @@ SpringAMQP还提供了ExchangeBuilder来简化这个过程
 
 
 
-#### 消息转换器
+### 消息转换器
 
 Spring的消息发送代码接收的消息体是一个Object：
 
@@ -1596,7 +1596,7 @@ Spring的消息发送代码接收的消息体是一个Object：
 
 
 
-##### 配置JSON转换器
+#### 配置JSON转换器
 
 所以JDK序列化方式并不合适。应当使消息体的体积更小、可读性更高，因此可以使用JSON方式来做序列化和反序列化。
 
@@ -1631,7 +1631,7 @@ public MessageConverter messageConverter(){
 
 
 
-##### 消费者接收Object
+#### 消费者接收Object
 
 消息的接收方接收消息时，要使用与发送方相同的格式接收。
 
@@ -1639,7 +1639,560 @@ public MessageConverter messageConverter(){
 
 
 
-## Elasticsearch
+### MessageProperties
+
+`RabbitTemplate`的发送的消息对象称之为`message`，而Message对象实际上携带了额外的`properties`参数，可以使用`properties`传递必要的参数，就类似于Http请求中的头部数据。
+
+> 可以通过调用 `setHeader(String key, Object value)` 方法用用户定义的 'header' 来扩展这些属性。
+
+也就是说可以使用header存储userId，具体实现方法是在`converAndSend`方法后再加一个匿名对象MessagePostProcessor，内部重写`postProcessMessage`方法：在内部使用setHeader方法将userId存入。实现如下：
+
+```java
+rabbitTemplate.convertAndSend("trade.topic", "order.create", itemIds, new MessagePostProcessor() {
+    @Override
+    public Message postProcessMessage(Message message) throws AmqpException {
+        message.getMessageProperties().setHeader("userId", UserContext.getUser());
+        return message;
+    }
+});
+```
+
+使用Lambda表达式简化后如下：
+
+```java
+rabbitTemplate.convertAndSend("trade.topic", "order.create", itemIds, message -> {
+    message.getMessageProperties().setHeader("userId", UserContext.getUser());
+    return message;
+});
+```
+
+上述方法虽然解决了传递问题，但是实际上，很多service层中的方法的参数都不包含userId，这是因为userid往往被存于`ThreadLocal`中，随用随取。所以需要将userId存入`ThreadLocal`之中，而如果每次Listener都添加一次又十分繁琐，所以应该设计一个方法使得userId自动被存于`ThreadLocal`之中。
+
+一个解决办法就是：通过重写消息转化器的`fromMessage`方法，使得每次消费者接收消息完成反序列化时自动将userId存于`TreadLocal`之中。该方法作为共有的配置类，存放于common模块下（这种共有的配置类一般会存放于一个普通的模块下）。具体实现如下：
+
+```java
+@Configuration
+public class MqConfig {
+    @Bean
+    public MessageConverter messageConverter(){
+        // 1.定义消息转换器
+        Jackson2JsonMessageConverter jackson2JsonMessageConverter = new Jackson2JsonMessageConverter(){
+            @Override
+            public Object fromMessage(Message message) throws MessageConversionException {
+                Long userId = message.getMessageProperties().getHeader("userId");
+                if (ObjectUtil.isNotNull(userId)) {
+                    UserContext.setUser(userId);
+                }
+                return super.fromMessage(message);
+            }
+        };
+        // 2.配置自动创建消息id，用于识别不同消息，也可以在业务中基于ID判断是否是重复消息
+        jackson2JsonMessageConverter.setCreateMessageIds(true);
+        return jackson2JsonMessageConverter;
+    }
+}
+```
+
+该方法源于：https://b11et3un53m.feishu.cn/wiki/OQH4weMbcimUSLkIzD6cCpN0nvc?comment_id=7381508989902684163&comment_type=0&comment_anchor=true
+
+
+
+## 发送者的可靠性
+
+实际上在开发中消息存在丢失的可能，大致分为以下几种情况：
+
+- 发送消息时丢失：
+  - 生产者发送消息时连接MQ失败
+  - 生产者发送消息到达MQ后未找到`Exchange`
+  - 生产者发送消息到达MQ的`Exchange`后，未找到合适的`Queue`
+  - 消息到达MQ后，处理消息的进程发生异常
+- MQ导致消息丢失：
+  - 消息到达MQ，保存到队列后，尚未消费就突然宕机
+- 消费者处理消息时：
+  - 消息接收后尚未处理突然宕机
+  - 消息接收后处理过程中抛出异常
+
+
+
+为了避免消息丢失，维护MQ的可靠性，需要保证：
+
+- 确保生产者一定把消息发送到MQ
+- 确保MQ不会将消息弄丢
+- 确保消费者一定要处理消息
+
+
+
+### 生产者重试机制
+
+针对发送者发送消息时因为网络故障导致与MQ的连接中断。SpringAMQP提供了消息发送时的重试机制，即：当`RabbitTemplate`与MQ连接超时后，多次重试。
+
+修改`publisher`模块的`application.yaml`文件，添加下面的内容：
+
+```YAML
+spring:
+  rabbitmq:
+    connection-timeout: 1s # 设置MQ的连接超时时间
+    template:
+      retry:
+        enabled: true # 开启超时重试机制
+        initial-interval: 1000ms # 失败后的初始等待时间
+        multiplier: 1 # 失败后下次的等待时长倍数，下次等待时长 = initial-interval * multiplier
+        max-attempts: 3 # 最大重试次数
+```
+
+**注意**：当网络不稳定的时候，利用重试机制可以有效提高消息发送的成功率。不过SpringAMQP提供的重试机制是**阻塞式**的重试，也就是说多次重试等待的过程中，当前线程是被阻塞的。
+
+如果对于业务性能有要求，建议禁用重试机制。如果一定要使用，请合理配置等待时长和重试次数，当然也可以考虑使用异步线程来执行发送消息的代码。
+
+
+
+### 生产者确认机制
+
+一般情况下不会出现因为网络导致的消息丢失，这种情况往往是无法预料的：比如物理网络问题、服务器提供商的问题、网络受到黑客攻击，不过少数情况下会产生消息发送到MQ之后丢失的现象，如：
+
+- MQ内部处理消息的进程发生了异常
+- 生产者发送消息到达MQ后未找到`Exchange`
+- 生产者发送消息到达MQ的`Exchange`后，未找到合适的`Queue`，因此无法路由
+
+针对上述情况，RabbitMQ提供了生产者消息确认机制，包括`Publisher Confirm`和`Publisher Return`两种。在开启确认机制的情况下，当生产者发送消息给MQ后，MQ会根据消息处理的情况返回不同的**回执**。
+
+如图所示：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723210054453-1.png)
+
+总结：
+
+- 当消息投递到MQ，但是路由失败时，通过**Publisher Return**返回异常信息，同时返回ack的确认信息，代表投递成功
+- 临时消息投递到了MQ，并且入队成功，返回`ACK`，告知投递成功
+- 持久消息投递到了MQ，并且入队完成持久化，返回`ACK` ，告知投递成功
+- 其它情况都会返回`NACK`，告知投递失败
+
+其中`ack`和`nack`属于**Publisher Confirm**机制，`ack`是投递成功；`nack`是投递失败。而`return`则属于**Publisher Return**机制。
+
+默认两种机制都是关闭状态，需要通过配置文件来开启。
+
+
+
+#### 个人理解
+
+对于`Confirm`机制而言，其仅仅确保了消息路由到（发送到）`Broker`，如成功传递到`Broker`则`broker`会给生产者一个应答来确定收到消息，生产者接收应答之后可以确定该消息是否正确发送到`Broker`，所以该机制仅能保证消息被`Broker`接收而不能确定消息是否路由到了正确到`exchange`或`queue`，若传递成功即返回`ACK`，传递不成功则返回`NACK`。（所谓broker是消息队列的核心组件之一，它的作用是接收、存储、分发和传递消息。）
+
+
+
+对于`Return`机制而言，它能确定消息是否正确路由到`queue`。该机制会返回错误的信息供后续逻辑处理。这也是为什么即便`exchange`没有绑定`queue`也仍然会返回投递成功而会通过`returrn`机制处理错误信息。
+
+
+
+**注意**：
+
+开启生产者确认比较消耗MQ性能，一般不建议开启。而且大家思考一下触发确认的几种情况：
+
+- 路由失败：一般是因为RoutingKey错误导致，往往是编程导致
+- 交换机名称错误：同样是编程错误导致
+- MQ内部故障：这种需要处理，但概率往往较低。因此只有对消息可靠性要求非常高的业务才需要开启，而且仅仅需要开启ConfirmCallback处理nack就可以了。
+
+
+
+
+
+### 实现生产者确认
+
+#### 开启生产者确认
+
+在`application.yaml`中添加如下配置：
+
+```yaml
+spring:
+  rabbitmq:
+    publisher-confirm-type: correlated # 开启publisher confirm机制，并设置confirm类型
+    publisher-returns: true # 开启publisher return机制
+```
+
+此处`publisher-confirm-type`有三种模式可选：
+
+- `none`：关闭confirm机制
+- `simple`：同步阻塞等待MQ的回执
+- `correlated`：MQ异步回调返回回执
+
+一般使用`correlated`回调机制。
+
+
+
+#### 定义ReturnCallback
+
+每个`RabbitTemplate`只能配置一个`ReturnCallback`，所以应该在公共配置类中统一进行定义，内容如下：
+
+```Java
+@Slf4j
+@AllArgsConstructor
+@Configuration
+public class MqConfig {
+    private final RabbitTemplate rabbitTemplate;
+
+    @PostConstruct
+    public void init(){
+        rabbitTemplate.setReturnsCallback(new RabbitTemplate.ReturnsCallback() {
+            @Override
+            public void returnedMessage(ReturnedMessage returned) {
+                log.error("触发return callback,");
+                log.debug("exchange: {}", returned.getExchange());
+                log.debug("routingKey: {}", returned.getRoutingKey());
+                log.debug("message: {}", returned.getMessage());
+                log.debug("replyCode: {}", returned.getReplyCode());
+                log.debug("replyText: {}", returned.getReplyText());
+            }
+        });
+    }
+}
+```
+
+`@PostConstruct`注解：主要用于类, 在bean被创建并完成属性注入后，执行一些初始化操作(带有@PostConstruct注解的方法会被自动调用。)
+
+
+
+#### 定义ConfirmCallback
+
+由于每个消息发送时的处理逻辑不一定相同，因此`ConfirmCallback`需要在每次发消息时单独定义：而`rabbitTemplate`的`converAndSend`方法则需要多传递一个参数，即`ConfirmCallback`
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723210717167-6.png)
+
+此处的`CorrelationData`中包含两个核心的属性：
+
+- `id`：消息的唯一标示，MQ对不同的消息的回执以此做判断，避免混淆
+- `SettableListenableFuture`：回执结果的Future对象
+
+在配置后，MQ的回执就会通过这个`Future`来返回，所以可以提前给`CorrelationData`中的`Future`添加回调函数来处理消息回执：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723210808072-9.png)
+
+
+
+## MQ的可靠性
+
+消息到达MQ后，若MQ没有保存数据，消息也可能丢失，所以要实现MQ的可靠性。
+
+
+
+### 数据持久化
+
+在RabbitMQ的`3.12`版本之前，RabbitMQ默认将接收到的消息保存在内存中，这样提高了消息的处理速度、降低了消息收发的延迟，但是这会导致两个问题：
+
+- 一旦MQ宕机，内存中数据会丢失。
+- 内存空间有限，若消费者产生故障或处理速度过慢会导致消息挤压进而引发MQ阻塞。
+
+为了保证数据的可靠性，必须配置数据持久化，包括：
+
+- 交换机持久化
+- 队列持久化
+- 消息持久化
+
+
+
+#### 交换机持久化
+
+在控制台的`Exchanges`页面，添加交换机时可以配置交换机的`Durability`参数：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723216566045-12.png)
+
+设置为`Durable`就是持久化模式，`Transient`就是临时模式。
+
+
+
+#### 队列持久化
+
+在控制台的Queues页面，添加队列时，同样可以配置队列的`Durability`参数：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723216582168-15.png)
+
+
+
+#### 消息持久化
+
+**注意**：在SpringAMQP中默认发送持久化消息，而在控制台中默认发送非持久化消息。
+
+**说明**：在开启持久化机制以后，如果同时还开启了生产者确认，那么MQ会在消息持久化以后才发送ACK回执，进一步确保消息的可靠性。
+
+不过出于性能考虑，为了减少IO次数，发送到MQ的消息并不是逐条持久化到数据库的，而是每隔一段时间批量持久化。一般间隔在100毫秒左右，这就会导致ACK有一定的延迟，因此建议生产者确认全部采用异步方式。
+
+
+
+### LazyMode
+
+一旦出现消息堆积问题，RabbitMQ的内存占用就会越来越高，直到触发内存预警上限。此时RabbitMQ会将内存消息刷到磁盘上，这个行为成为`PageOut`。`PageOut`会耗费一段时间，并且会阻塞队列进程。因此在这个过程中RabbitMQ不会再处理新的消息，生产者的所有请求都会被阻塞。
+
+
+
+在RabbitMQ的`3.6.0`版本开始，增加了`Lazy Queues`的模式，即`惰性队列`，其特性如下：
+
+- 接收到消息后直接存入磁盘而非内存
+- 消费者要消费消息时才会从磁盘中读取并加载到内存（也就是懒加载）
+- 支持数百万条的消息存储
+
+
+
+**注意**：在3.12版本之后，LazyQueue已经成为所有队列的默认格式。因此官方推荐升级MQ为3.12版本或者所有队列都设置为LazyQueue模式。
+
+
+
+#### 控制台配置Lazy模式
+
+在添加队列的时候，添加`x-queue-mod=lazy`参数即可设置队列为Lazy模式：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723216830080-18.png)
+
+
+
+#### 代码配置Lazy模式
+
+在利用SpringAMQP声明队列的时候，添加`x-queue-mod=lazy`参数也可设置队列为Lazy模式：
+
+```Java
+@Bean
+public Queue lazyQueue(){
+    return QueueBuilder
+            .durable("lazy.queue")
+            .lazy() // 开启Lazy模式
+            .build();
+}
+```
+
+这里是通过`QueueBuilder`的`lazy()`函数配置Lazy模式，底层源码如下：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723216906834-25.png)
+
+当然，我们也可以基于注解来声明队列并设置为Lazy模式：
+
+```Java
+@RabbitListener(queuesToDeclare = @Queue(
+        name = "lazy.queue",
+        durable = "true",
+        arguments = @Argument(name = "x-queue-mode", value = "lazy")
+))
+public void listenLazyQueue(String msg){
+    log.info("接收到 lazy.queue的消息：{}", msg);
+}
+```
+
+
+
+#### 更新已有队列为lazy模式
+
+建议使用控制台直接修改。也可以使用命令行设置，不过较为繁琐，如下：
+
+```Shell
+rabbitmqctl set_policy Lazy "^lazy-queue$" '{"queue-mode":"lazy"}' --apply-to queues  
+```
+
+
+
+## 消费者可靠性
+
+当RabbitMQ向消费者投递消息以后，需要知道消费者的处理状态如何。因为消息投递给消费者并不代表就一定被正确消费了，可能出现的故障有很多，比如：
+
+- 消息投递的过程中出现了网络故障
+- 消费者接收到消息后突然宕机
+- 消费者接收到消息后，因处理不当导致异常
+- ...
+
+一旦发生上述情况，消息也会丢失。因此，RabbitMQ必须知道消费者的处理状态，一旦消息处理失败才能重新投递消息。
+
+
+
+###  消费者确认机制
+
+为了确认消费者是否成功处理消息，RabbitMQ提供了消费者确认机制（**Consumer Acknowledgement**）。即：当消费者处理消息结束后，应该向RabbitMQ发送一个回执，告知RabbitMQ自己消息处理状态。回执有三种可选值：
+
+- ack：成功处理消息，RabbitMQ从队列中删除该消息
+- nack：消息处理失败，RabbitMQ需要再次投递消息
+- reject：消息处理失败并拒绝该消息，RabbitMQ从队列中删除该消息
+
+一般reject方式用的较少，其出现的原因一般是消息格式有问题，即消息无法被正常转换，这并不属于业务的异常。因此大多数情况下需要将消息处理的代码通过`try catch`机制捕获，消息处理成功时返回ack，处理失败时返回nack。
+
+由于消息回执的处理代码比较统一，因此SpringAMQP实现了消息确认。并允许通过配置文件设置ACK处理方式，有三种模式：
+
+- **`none`**：不处理。即消息投递给消费者后立刻ack，消息会立刻从MQ删除。非常不安全，不建议使用
+- **`manual`**：手动模式。需要自己在业务代码中调用api，发送`ack`或`reject`，存在业务入侵，但更灵活
+- **`auto`**：自动模式。SpringAMQP利用AOP对我们的消息处理逻辑做了环绕增强，当业务正常执行时则自动返回`ack`.  当业务出现异常时，根据异常判断返回不同结果：
+  - 如果是**业务异常**，会自动返回`nack`；
+  - 如果是**消息处理或校验异常**，自动返回`reject`;
+
+
+
+通过下面的配置可以修改SpringAMQP的ACK处理方式：
+
+```YAML
+spring:
+  rabbitmq:
+    listener:
+      simple:
+        acknowledge-mode: none # 不做处理
+```
+
+
+
+### 失败重试机制
+
+当消费者产生nack时，消息会requeue（重入队）到队列，再重新发送给消费者。如果消费者再次执行依然出错，消息会再次requeue到队列，再次投递，直到消息处理成功为止。
+
+极端情况就是消费者一直无法执行成功，那么消息requeue就会无限循环，导致mq的消息处理飙升，带来不必要的压力：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723218040416-28.png)
+
+为了应对这种极端的情况，SpringAMQP实现了消费者失败重试机制：在消费者出现异常时利用本地重试，而不是无限制的requeue到mq队列。
+
+
+
+通过修改`application.yml`文件，添加内容开启：
+
+```YAML
+spring:
+  rabbitmq:
+    listener:
+      simple:
+        retry:
+          enabled: true # 开启消费者失败重试
+          initial-interval: 1000ms # 初识的失败等待时长为1秒
+          multiplier: 1 # 失败的等待时长倍数，下次等待时长 = multiplier * last-interval
+          max-attempts: 3 # 最大重试次数
+          stateless: true # true无状态；false有状态。如果业务中包含事务，这里改为false
+```
+
+
+
+此时，若出现上述极端情况后：消费者在失败后消息没有重新回到MQ无限重新投递，而是在本地重试了3次；本地重试3次以后，抛出了`AmqpRejectAndDontRequeueException`异常。且SpringAMQP会直接返回`reject`。该消息被从消息队列中删除。
+
+
+
+### 消息失败处理策略
+
+若对消息可靠性要求较高的业务场景下，且产生了上述情况，如果直接删除消息则不符合业务场景。所以SpringAMQP允许开发者自定义重试次数耗尽后的消息处理策略，这个策略是由`MessageRecovery`接口来定义的，它有3个不同实现：
+
+-  `RejectAndDontRequeueRecoverer`：重试耗尽后，直接`reject`，丢弃消息。默认就是这种方式 
+-  `ImmediateRequeueMessageRecoverer`：重试耗尽后，返回`nack`，消息重新入队 
+-  `RepublishMessageRecoverer`：重试耗尽后，将失败消息投递到指定的交换机 
+
+
+
+较为常用的一种处理方案是`RepublishMessageRecoverer`，失败后将消息投递到一个指定的，专门存放异常消息的队列，后续由人工集中处理：可以通过邮件或者短信告知开发者，由开发者人工处理。
+
+
+
+#### 使用RepublishMessageRecoverer策略
+
+在配置类中定义一个RepublishMessageRecoverer，关联专门负责处理异常消息的队列和交换机。
+
+```Java
+@Bean
+public MessageRecoverer republishMessageRecoverer(RabbitTemplate rabbitTemplate){
+    return new RepublishMessageRecoverer(rabbitTemplate, "error.direct", "error");
+}
+```
+
+其中error代表`routing key`。
+
+
+
+案例如下：
+
+```Java
+@Configuration
+@ConditionalOnProperty(name = "spring.rabbitmq.listener.simple.retry.enabled", havingValue = "true")
+public class ErrorMessageConfig {
+    
+    // 这三个Bean类是在生成处理异常的交换机和队列，也可以在控制台直接创建。
+    @Bean
+    public DirectExchange errorMessageExchange(){
+        return new DirectExchange("error.direct");
+    }
+    @Bean
+    public Queue errorQueue(){
+        return new Queue("error.queue", true);
+    }
+    @Bean
+    public Binding errorBinding(Queue errorQueue, DirectExchange errorMessageExchange){
+        return BindingBuilder.bind(errorQueue).to(errorMessageExchange).with("error");
+    }
+
+    @Bean
+    public MessageRecoverer republishMessageRecoverer(RabbitTemplate rabbitTemplate){
+        return new RepublishMessageRecoverer(rabbitTemplate, "error.direct", "error");
+    }
+}
+```
+
+**注意**：`@ConditionalOnProperty`代表在满足条件时控制`@Configuration`生效。即在开启消费者失败重试机制的模块下才使配置生效。用于公共配置类。
+
+
+
+### 业务幂等性
+
+在数学里，幂等性表示为：`f(x) = f(f(x))`，例如求绝对值函数；而在程序开发中，则是指同一个业务，执行一次或多次对业务状态的影响是一致的。例如：
+
+- 根据id删除数据
+- 查询数据
+
+
+
+但是有的数据的更新往往不是幂等的，若重复执行则可能会造成灾难性后果，比如：
+
+- 取消订单，恢复库存的业务。如果多次恢复就会出现库存重复增加的情况
+- 退款业务。重复退款对商家而言会有经济损失。
+
+所以，开发者要尽可能避免业务被重复执行。
+
+然而在实际业务场景中，由于意外经常会出现业务被重复执行的情况，例如：
+
+- 页面卡顿时频繁刷新导致表单重复提交
+- 服务间调用的重试
+- MQ消息的重复投递
+
+
+
+为了保证消息处理的幂等性，有如下两种解决方案：
+
+- 唯一消息ID
+- 业务状态判断
+
+
+
+#### 唯一消息ID
+
+这个思路非常简单：
+
+1. 每一条消息都生成一个唯一的id，与消息一起投递给消费者。
+2. 消费者接收到消息后处理自己的业务，业务处理成功后将消息ID保存到数据库
+3. 如果下次又收到相同消息，去数据库查询判断是否存在，存在则为重复消息放弃处理。
+
+SpringAMQP的MessageConverter自带了MessageID的功能，只要开启这个功能即可。
+
+```Java
+@Bean
+public MessageConverter messageConverter(){
+    // 1.定义消息转换器
+    Jackson2JsonMessageConverter jjmc = new Jackson2JsonMessageConverter();
+    // 2.配置自动创建消息id，用于识别不同消息，也可以在业务中基于ID判断是否是重复消息
+    jjmc.setCreateMessageIds(true);
+    return jjmc;
+}
+```
+
+但是使用该方案会有两个问题：
+
+1. 会添加一些与原本业务无关的健壮性判断----业务侵入问题
+
+2. 这些数据库的操作也会影响业务原本的性能
+
+
+
+#### 业务判断
+
+业务判断就是基于业务本身的逻辑或状态来判断是否是重复的请求或消息，不同的业务场景判断的思路也不一样。灵活使用。
+
+比如将业务订单标记为已支付，可以先判断订单状态，再处理消息。
+
+
+
+# ElasticSearch
 
 
 

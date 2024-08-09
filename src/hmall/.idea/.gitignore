@@ -7,4 +7,5 @@
 /dataSources/
 /dataSources.local.xml
 # 忽略日志文件
+spring.log
 *.log
