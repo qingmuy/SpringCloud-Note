@@ -2192,6 +2192,185 @@ public MessageConverter messageConverter(){
 
 
 
+## 延迟消息
+
+在电商的支付业务中，对于一些库存有限的商品，为了更好的用户体验，通常都会在用户下单时立刻扣减商品库存。例如电影院购票、高铁购票，下单后就会锁定座位资源，其他人无法重复购买。
+
+但是这样就存在一个问题，假如用户下单后一直不付款，就会一直占有库存资源，导致其他客户无法正常交易。
+
+因此，电商中通常的做法就是：**对于超过一定时间未支付的订单，应该立刻取消订单并释放占用的库存**。
+
+例如，订单支付超时时间为30分钟，则我们应该在用户下单后的第30分钟检查订单支付状态，如果发现未支付，应该立刻取消订单，释放库存。
+
+问题在于如何才能准确的实现在下单后第30分钟去检查支付状态？
+
+像这种在一段时间以后才执行的任务，一般称之为**延迟任务**，而要实现延迟任务，最简单的方案就是利用MQ的延迟消息了。
+
+在RabbitMQ中实现延迟消息也有两种方案：
+
+- 死信交换机+TTL
+- 延迟消息插件
+
+
+
+### 死信交换机和延迟消息
+
+#### 死信交换机
+
+当一个队列中的消息满足下列情况之一时，可以成为死信（dead letter）：
+
+- 消费者使用`basic.reject`或 `basic.nack`声明消费失败，并且消息的`requeue`参数设置为false
+- 消息是一个过期消息，超时无人消费
+- 要投递的队列消息满了，无法投递
+
+如果一个队列中的消息已经成为死信，并且这个队列通过**`dead-letter-exchange`**属性指定了一个交换机，那么队列中的死信就会投递到这个交换机中，而这个交换机就称为**死信交换机**（Dead Letter Exchange）。而此时加入有队列与死信交换机绑定，则最终死信就会被投递到这个队列中。
+
+死信交换机的作用：
+
+1. 收集那些因处理失败而被拒绝的消息
+2. 收集那些因队列满了而被拒绝的消息
+3. 收集因TTL（有效期）到期的消息
+
+
+
+### 延迟消息
+
+上述解决办法与消费者重试的`RepublishMessageRecoverer`作用类似。
+
+
+
+可以通过死信交换机实现延迟消息，具体方案如下：
+
+首先设定一个普通的交换机和队列，但是不对队列进行消费者绑定，而是将死信交换机与普通的队列进行绑定，再对死信交换机绑定一个队列。如图所示：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723287910632-1.png)
+
+此时若发送一条消息到`ttl.fanout`，设定`RoutingKey`，再设定消息有效期为5000毫秒。
+
+> 需要**注意**的是，普通的交换机到队列之间的`RoutingKey`必须与死信交换机到死信队列的`RoutingKey`保持一致，这是因为消息变为死信并投递到死信交换机时，会沿用之前的`RoutingKey`，这样死信交换机才能正确路由消息。
+
+由于普通交换机内没有消费者，则该消息必定会转变为死信并被投递到死信交换机，且沿用之前的`RoutingKey`，发送到死信队列，此时就实现了延迟消息，延迟时间即为设定的消息有效期。
+
+
+
+### DelayExchange插件
+
+基于死信队列虽然可以实现延迟消息，但是十分繁琐；所以RabbitMQ社区提供了一个插件以实现相同的效果，即DelayExchange插件：https://www.rabbitmq.com/blog/2015/04/16/scheduling-messages-with-rabbitmq
+
+
+
+#### 下载
+
+https://b11et3un53m.feishu.cn/wiki/A9SawKUxsikJ6dk3icacVWb4n3g#QvrfdlyRKoZpypxpzJjcNEcRnIz
+
+下载的版本需要与MQ版本一致。
+
+
+
+#### 安装
+
+基于Docker的安装方法如下，首先需要找到RabbitMQ的插件目录对应的数据卷，使用如下命令查看：
+
+```Shell
+docker volume inspect mq-plugins
+```
+
+进入该目录并将插件上传至该目录，随后执行命令以安装插件：
+
+```Shell
+docker exec -it mq rabbitmq-plugins enable rabbitmq_delayed_message_exchange
+```
+
+
+
+#### 声明延迟交换机
+
+消费者基于注解方式实现：
+
+```Java
+@RabbitListener(bindings = @QueueBinding(
+        value = @Queue(name = "delay.queue", durable = "true"),
+        exchange = @Exchange(name = "delay.direct", delayed = "true"),
+        key = "delay"
+))
+public void listenDelayMessage(String msg){
+    log.info("接收到delay.queue的延迟消息：{}", msg);
+}
+```
+
+实际上就是在`Exchange`属性后声明`delayed`属性。
+
+
+
+基于`@Bean`的方式实现：
+
+```Java
+@Slf4j
+@Configuration
+public class DelayExchangeConfig {
+
+    @Bean
+    public DirectExchange delayExchange(){
+        return ExchangeBuilder
+                .directExchange("delay.direct") // 指定交换机类型和名称
+                .delayed() // 设置delay的属性为true
+                .durable(true) // 持久化
+                .build();
+    }
+
+    @Bean
+    public Queue delayedQueue(){
+        return new Queue("delay.queue");
+    }
+    
+    @Bean
+    public Binding delayQueueBinding(){
+        return BindingBuilder.bind(delayedQueue()).to(delayExchange()).with("delay");
+    }
+}
+```
+
+即使用`ExchangeBuilder`增添属性`delay`。
+
+
+
+#### 发送延迟消息
+
+发送消息时必须通过x-delay属性设定延迟时间：
+
+```Java
+@Test
+void testPublisherDelayMessage() {
+    // 1.创建消息
+    String message = "hello, delayed message";
+    // 2.发送消息，利用消息后置处理器添加消息头
+    rabbitTemplate.convertAndSend("delay.direct", "delay", message, new MessagePostProcessor() {
+        @Override
+        public Message postProcessMessage(Message message) throws AmqpException {
+            // 添加延迟消息属性
+            message.getMessageProperties().setDelay(5000);
+            return message;
+        }
+    });
+}
+```
+
+实际上是利用`MessageProperties`增添延迟时间属性。
+
+
+
+**注意**：延迟消息插件内部会维护一个本地数据库表，同时使用Elang Timers功能实现计时。如果消息的延迟时间设置较长，可能会导致堆积的延迟消息非常多，会带来较大的CPU开销，同时延迟消息的时间会存在误差。
+
+因此，**不建议设置延迟时间过长的延迟消息**。
+
+
+
+
+
+
+
+
+
 # ElasticSearch
 
 

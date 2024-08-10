@@ -1,6 +1,7 @@
 package com.qingmuy.api.config;
 
 import com.hmall.common.utils.UserContext;
+import com.qingmuy.api.client.fallback.PayClientFallback;
 import feign.Logger;
 import feign.RequestInterceptor;
 import feign.RequestTemplate;
@@ -23,5 +24,10 @@ public class DefaultFeignConfig {
                 }
             }
         };
+    }
+
+    @Bean
+    public PayClientFallback payClientFallback(){
+        return new PayClientFallback();
     }
 }

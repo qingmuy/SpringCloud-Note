@@ -1,5 +1,6 @@
 package com.qingmuy.trade.service.Impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmall.common.exception.BadRequestException;
 import com.hmall.common.utils.UserContext;
@@ -7,8 +8,10 @@ import com.qingmuy.api.client.ItemClient;
 import com.qingmuy.api.domain.dto.ItemDTO;
 import com.qingmuy.api.domain.dto.OrderDetailDTO;
 import com.qingmuy.api.domain.dto.OrderFormDTO;
+import com.qingmuy.trade.constants.MqConstants;
 import com.qingmuy.trade.domain.po.Order;
 import com.qingmuy.trade.domain.po.OrderDetail;
+import com.qingmuy.trade.mapper.OrderDetailMapper;
 import com.qingmuy.trade.mapper.OrderMapper;
 import com.qingmuy.trade.service.IOrderDetailService;
 import com.qingmuy.trade.service.IOrderService;
@@ -17,6 +20,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +45,13 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     private final IOrderDetailService detailService;
 
     private final ItemClient itemClient;
+
+    @Resource
+    OrderMapper orderMapper;
+
+    @Resource
+    OrderDetailMapper orderDetailMapper;
+
 
 
     /**
@@ -102,6 +113,17 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         } catch (Exception e) {
             throw new RuntimeException("库存不足！");
         }
+
+        // 5.发送延迟消息，检测订单支付状态：延迟消息迟滞在交换机内
+        rabbitTemplate.convertAndSend(
+                MqConstants.DELAY_EXCHANGE_NAME,
+                MqConstants.DELAY_ORDER_KEY,
+                order.getId(),
+                message -> {
+                    message.getMessageProperties().setDelay(10000);
+                    return message;
+                }
+        );
         return order.getId();
     }
 
@@ -132,6 +154,23 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 .eq(Order::getId, orderId)
                 .eq(Order::getStatus, 1)
                 .update();
+    }
+
+    @Override
+    public void cancelOrder(Long orderId) {
+        // 将订单状态修改为已关闭
+        Order order = orderMapper.selectById(orderId);
+
+        if (order == null || order.getStatus() == 5) {
+            return;
+        }
+        order.setStatus(5);
+        orderMapper.updateById(order);
+        // 恢复订单中已经扣除的库存
+        LambdaQueryWrapper<OrderDetail> qw = new LambdaQueryWrapper<>();
+        qw.eq(OrderDetail::getOrderId, orderId);
+        List<OrderDetail> orderDetails = orderDetailMapper.selectList(qw);
+        // TODO 留空，不会
     }
 
     private List<OrderDetail> buildDetails(Long orderId, List<ItemDTO> items, Map<Long, Integer> numMap) {
