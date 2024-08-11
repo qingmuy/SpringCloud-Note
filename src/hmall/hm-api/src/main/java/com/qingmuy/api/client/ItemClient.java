@@ -3,11 +3,9 @@ package com.qingmuy.api.client;
 import com.qingmuy.api.domain.dto.ItemDTO;
 import com.qingmuy.api.domain.dto.OrderDetailDTO;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -18,4 +16,7 @@ public interface ItemClient {
 
     @PutMapping("/items/stock/deduct")
     void deductStock(@RequestBody List<OrderDetailDTO> items);
+
+    @PostMapping("items/restorestock")
+    void restoreStock(ArrayList<OrderDetailDTO> orderDetailDTOS);
 }

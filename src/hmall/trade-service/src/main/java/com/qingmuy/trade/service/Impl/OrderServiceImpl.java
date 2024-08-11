@@ -17,6 +17,7 @@ import com.qingmuy.trade.service.IOrderDetailService;
 import com.qingmuy.trade.service.IOrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -170,7 +171,15 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         LambdaQueryWrapper<OrderDetail> qw = new LambdaQueryWrapper<>();
         qw.eq(OrderDetail::getOrderId, orderId);
         List<OrderDetail> orderDetails = orderDetailMapper.selectList(qw);
-        // TODO 留空，不会
+        // 处理订单信息
+        ArrayList<OrderDetailDTO> orderDetailDTOS = new ArrayList<>();
+        for (OrderDetail od : orderDetails) {
+            OrderDetailDTO orderDetailDTO = new OrderDetailDTO();
+            BeanUtils.copyProperties(od, orderDetailDTO);
+            orderDetailDTOS.add(orderDetailDTO);
+        }
+        // 同步通讯调用
+        itemClient.restoreStock(orderDetailDTOS);
     }
 
     private List<OrderDetail> buildDetails(Long orderId, List<ItemDTO> items, Map<Long, Integer> numMap) {
