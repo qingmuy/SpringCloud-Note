@@ -1,6 +1,5 @@
 package com.qingmuy.item.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmall.common.exception.BizIllegalException;
 import com.hmall.common.utils.BeanUtils;
@@ -11,6 +10,7 @@ import com.qingmuy.item.mapper.ItemMapper;
 import com.qingmuy.item.service.IItemService;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
 import java.util.Collection;
 import java.util.List;
 
@@ -24,10 +24,17 @@ import java.util.List;
 @Service
 public class ItemServiceImpl extends ServiceImpl<ItemMapper, Item> implements IItemService {
 
+    @Resource
+    ItemMapper itemMapper;
+
+    /**
+     * 扣减余额
+     * @param items 商品合集
+     */
     @Override
     public void deductStock(List<OrderDetailDTO> items) {
         String sqlStatement = "com.qingmuy.item.mapper.ItemMapper.updateStock";
-        boolean r;
+        boolean r = false;
         try {
             r = executeBatch(items, (sqlSession, entity) -> sqlSession.update(sqlStatement, entity));
         } catch (Exception e) {
@@ -38,17 +45,23 @@ public class ItemServiceImpl extends ServiceImpl<ItemMapper, Item> implements II
         }
     }
 
+    /**
+     * 查询商品
+     * @param ids 商品id集合
+     * @return 订单信息
+     */
     @Override
     public List<ItemDTO> queryItemByIds(Collection<Long> ids) {
         return BeanUtils.copyList(listByIds(ids), ItemDTO.class);
     }
 
+    /**
+     * 恢复库存
+     * @param orderDetailDTOs 超时订单的信息
+     */
     @Override
     public void restoreStock(List<OrderDetailDTO> orderDetailDTOs) {
-        LambdaQueryWrapper<Item> qw = new LambdaQueryWrapper<>();
-        for (OrderDetailDTO orderDetailDTO : orderDetailDTOs) {
-            qw.eq(Item::getId, orderDetailDTO.getItemId());
-
-        }
+        // 恢复库存
+        itemMapper.restoreStock(orderDetailDTOs);
     }
 }

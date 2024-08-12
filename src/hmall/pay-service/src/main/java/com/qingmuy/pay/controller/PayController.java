@@ -40,7 +40,12 @@ public class PayController {
         payOrderService.tryPayOrderByBalance(payOrderFormDTO);
     }
 
-    @ApiOperation("根据id查询支付单")
+    /**
+     * 根据订单id查询支付单
+     * @param id 订单id
+     * @return 支付单
+     */
+    @ApiOperation("根据订单id查询支付单")
     @GetMapping("/biz/{id}")
     public PayOrderDTO queryPayOrderByBizOrderNo(@PathVariable("id") Long id){
         PayOrder payOrder = payOrderService.lambdaQuery().eq(PayOrder::getBizOrderNo, id).one();

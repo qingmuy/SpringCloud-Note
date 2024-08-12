@@ -83,8 +83,8 @@ public class ItemController {
     }
 
     @ApiOperation("批量恢复库存")
-    @PostMapping("items/restorestock")
-    public void restoreStock(List<OrderDetailDTO> orderDetailDTO) {
+    @PostMapping("/restorestock")
+    public void restoreStock(@RequestBody List<OrderDetailDTO> orderDetailDTO) {
         itemService.restoreStock(orderDetailDTO);
     }
 }

@@ -176,9 +176,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         for (OrderDetail od : orderDetails) {
             OrderDetailDTO orderDetailDTO = new OrderDetailDTO();
             BeanUtils.copyProperties(od, orderDetailDTO);
+
             orderDetailDTOS.add(orderDetailDTO);
         }
-        // 同步通讯调用
+        // 同步通讯调用，恢复订单库存
         itemClient.restoreStock(orderDetailDTOS);
     }
 
