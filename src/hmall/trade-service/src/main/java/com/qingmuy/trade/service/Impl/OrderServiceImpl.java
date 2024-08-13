@@ -1,6 +1,5 @@
 package com.qingmuy.trade.service.Impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmall.common.exception.BadRequestException;
 import com.hmall.common.utils.UserContext;
@@ -11,13 +10,11 @@ import com.qingmuy.api.domain.dto.OrderFormDTO;
 import com.qingmuy.trade.constants.MqConstants;
 import com.qingmuy.trade.domain.po.Order;
 import com.qingmuy.trade.domain.po.OrderDetail;
-import com.qingmuy.trade.mapper.OrderDetailMapper;
 import com.qingmuy.trade.mapper.OrderMapper;
 import com.qingmuy.trade.service.IOrderDetailService;
 import com.qingmuy.trade.service.IOrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,9 +46,6 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
     @Resource
     OrderMapper orderMapper;
-
-    @Resource
-    OrderDetailMapper orderDetailMapper;
 
 
 
@@ -168,7 +162,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         order.setStatus(5);
         orderMapper.updateById(order);
         // 恢复订单中已经扣除的库存
-        LambdaQueryWrapper<OrderDetail> qw = new LambdaQueryWrapper<>();
+        /*LambdaQueryWrapper<OrderDetail> qw = new LambdaQueryWrapper<>();
         qw.eq(OrderDetail::getOrderId, orderId);
         List<OrderDetail> orderDetails = orderDetailMapper.selectList(qw);
         // 处理订单信息
@@ -180,7 +174,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             orderDetailDTOS.add(orderDetailDTO);
         }
         // 同步通讯调用，恢复订单库存
-        itemClient.restoreStock(orderDetailDTOS);
+        itemClient.restoreStock(orderDetailDTOS);*/
+        itemClient.restoreStock(orderId);
     }
 
     private List<OrderDetail> buildDetails(Long orderId, List<ItemDTO> items, Map<Long, Integer> numMap) {

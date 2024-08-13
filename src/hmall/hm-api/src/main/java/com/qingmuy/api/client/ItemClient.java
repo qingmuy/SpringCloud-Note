@@ -5,7 +5,6 @@ import com.qingmuy.api.domain.dto.OrderDetailDTO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -18,5 +17,5 @@ public interface ItemClient {
     void deductStock(@RequestBody List<OrderDetailDTO> items);
 
     @PostMapping("items/restorestock")
-    void restoreStock(ArrayList<OrderDetailDTO> orderDetailDTOS);
+    void restoreStock(Long orderId);
 }

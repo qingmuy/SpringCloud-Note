@@ -5,8 +5,6 @@ import com.qingmuy.item.domain.dto.OrderDetailDTO;
 import com.qingmuy.item.domain.po.Item;
 import org.apache.ibatis.annotations.Update;
 
-import java.util.List;
-
 /**
  * <p>
  * 商品表 Mapper 接口
@@ -21,8 +19,13 @@ public interface ItemMapper extends BaseMapper<Item> {
     void updateStock(OrderDetailDTO orderDetail);
 
     /**
-     * 遍历列表中的OrderDetailDTO对象，恢复库存
-     * @param orderDetailDTOs 存储OrderDetailDTO的列表
+     * 根据订单id恢复库存
+     * @param orderId 订单id
      */
-    void restoreStock(List<OrderDetailDTO> orderDetailDTOs);
+    @Update("update item t1 set stock = stock + (\n" +
+            "    select num  from `hm-trade`.order_detail t2 where order_id = #{orderId} and t2.item_id = t1.id\n" +
+            ") where exists (\n" +
+            "    select 1 from `hm-trade`.order_detail t2 where order_id = #{orderId} and t2.item_id = t1.id\n" +
+            ")")
+    void restoreStock(Long orderId);
 }

@@ -34,7 +34,7 @@ public class ItemServiceImpl extends ServiceImpl<ItemMapper, Item> implements II
     @Override
     public void deductStock(List<OrderDetailDTO> items) {
         String sqlStatement = "com.qingmuy.item.mapper.ItemMapper.updateStock";
-        boolean r = false;
+        boolean r;
         try {
             r = executeBatch(items, (sqlSession, entity) -> sqlSession.update(sqlStatement, entity));
         } catch (Exception e) {
@@ -57,11 +57,11 @@ public class ItemServiceImpl extends ServiceImpl<ItemMapper, Item> implements II
 
     /**
      * 恢复库存
-     * @param orderDetailDTOs 超时订单的信息
+     * @param orderId 超时订单id
      */
     @Override
-    public void restoreStock(List<OrderDetailDTO> orderDetailDTOs) {
+    public void restoreStock(Long orderId) {
         // 恢复库存
-        itemMapper.restoreStock(orderDetailDTOs);
+        itemMapper.restoreStock(orderId);
     }
 }
