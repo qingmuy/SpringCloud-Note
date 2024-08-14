@@ -17,15 +17,4 @@ public interface ItemMapper extends BaseMapper<Item> {
 
     @Update("UPDATE item SET stock = stock - #{num} WHERE id = #{itemId}")
     void updateStock(OrderDetailDTO orderDetail);
-
-    /**
-     * 根据订单id恢复库存
-     * @param orderId 订单id
-     */
-    @Update("update item t1 set stock = stock + (\n" +
-            "    select num  from `hm-trade`.order_detail t2 where order_id = #{orderId} and t2.item_id = t1.id\n" +
-            ") where exists (\n" +
-            "    select 1 from `hm-trade`.order_detail t2 where order_id = #{orderId} and t2.item_id = t1.id\n" +
-            ")")
-    void restoreStock(Long orderId);
 }

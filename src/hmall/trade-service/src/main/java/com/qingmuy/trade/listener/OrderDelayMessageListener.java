@@ -18,6 +18,10 @@ public class OrderDelayMessageListener {
     private final IOrderService orderService;
     private final PayClient payClient;
 
+    /**
+     * 监听消息队列 处理延迟消息 对超时订单进行处理
+     * @param orderId 订单id
+     */
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = MqConstants.DELAY_ORDER_QUEUE_NAME),
             exchange = @Exchange(name = MqConstants.DELAY_EXCHANGE_NAME, delayed = "true"),
@@ -38,6 +42,7 @@ public class OrderDelayMessageListener {
             // 4.1.已支付，标记订单状态为已支付
             orderService.markOrderPaySuccess(orderId);
         }else{
+            // 4.2 未支付，取消订单并将库存恢复
             orderService.cancelOrder(orderId);
         }
     }

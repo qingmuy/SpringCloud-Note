@@ -10,7 +10,6 @@ import com.qingmuy.item.mapper.ItemMapper;
 import com.qingmuy.item.service.IItemService;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
 import java.util.Collection;
 import java.util.List;
 
@@ -23,9 +22,6 @@ import java.util.List;
  */
 @Service
 public class ItemServiceImpl extends ServiceImpl<ItemMapper, Item> implements IItemService {
-
-    @Resource
-    ItemMapper itemMapper;
 
     /**
      * 扣减余额
@@ -53,15 +49,5 @@ public class ItemServiceImpl extends ServiceImpl<ItemMapper, Item> implements II
     @Override
     public List<ItemDTO> queryItemByIds(Collection<Long> ids) {
         return BeanUtils.copyList(listByIds(ids), ItemDTO.class);
-    }
-
-    /**
-     * 恢复库存
-     * @param orderId 超时订单id
-     */
-    @Override
-    public void restoreStock(Long orderId) {
-        // 恢复库存
-        itemMapper.restoreStock(orderId);
     }
 }

@@ -48,7 +48,6 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     OrderMapper orderMapper;
 
 
-
     /**
      * 创建订单
      * @param orderFormDTO 订单信息
@@ -151,9 +150,13 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 .update();
     }
 
+    /**
+     * 取消订单：将订单状态标记为取消，并返还以前的库存
+     * @param orderId 订单id
+     */
     @Override
     public void cancelOrder(Long orderId) {
-        // 将订单状态修改为已关闭
+        // 1. 将订单状态修改为已关闭
         Order order = orderMapper.selectById(orderId);
 
         if (order == null || order.getStatus() == 5) {
@@ -161,21 +164,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         }
         order.setStatus(5);
         orderMapper.updateById(order);
-        // 恢复订单中已经扣除的库存
-        /*LambdaQueryWrapper<OrderDetail> qw = new LambdaQueryWrapper<>();
-        qw.eq(OrderDetail::getOrderId, orderId);
-        List<OrderDetail> orderDetails = orderDetailMapper.selectList(qw);
-        // 处理订单信息
-        ArrayList<OrderDetailDTO> orderDetailDTOS = new ArrayList<>();
-        for (OrderDetail od : orderDetails) {
-            OrderDetailDTO orderDetailDTO = new OrderDetailDTO();
-            BeanUtils.copyProperties(od, orderDetailDTO);
-
-            orderDetailDTOS.add(orderDetailDTO);
-        }
-        // 同步通讯调用，恢复订单库存
-        itemClient.restoreStock(orderDetailDTOS);*/
-        itemClient.restoreStock(orderId);
+        // 2. 恢复订单中已经扣除的库存
+        orderMapper.restoreStock(orderId);
     }
 
     private List<OrderDetail> buildDetails(Long orderId, List<ItemDTO> items, Map<Long, Integer> numMap) {

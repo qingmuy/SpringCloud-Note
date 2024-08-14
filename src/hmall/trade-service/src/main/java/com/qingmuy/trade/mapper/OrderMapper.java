@@ -14,4 +14,5 @@ import com.qingmuy.trade.domain.po.Order;
  */
 public interface OrderMapper extends BaseMapper<Order> {
 
+    void restoreStock(Long orderId);
 }

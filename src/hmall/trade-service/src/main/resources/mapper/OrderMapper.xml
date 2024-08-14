@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.qingmuy.trade.mapper.OrderMapper">
+    <update id="restoreStock">
+        update `hm-item`.item t1 set stock = stock + (
+            select num  from `hm-trade`.order_detail t2 where order_id = #{orderId} and t2.item_id = t1.id
+        ) where exists (
+            select 1 from `hm-trade`.order_detail t2 where order_id = #{orderId} and t2.item_id = t1.id
+        )
+    </update>
+</mapper>
