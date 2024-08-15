@@ -3710,3 +3710,534 @@ GET /{索引库名}/_search
 - `from`和`size`：分页条件
 - `sort`：排序条件
 - `highlight`：高亮条件
+
+
+
+## RestClient查询
+
+文档的查询依然使用 `RestHighLevelClient`对象，查询的基本步骤如下：
+
+- 1）创建`request`对象，这次是搜索，所以是`SearchRequest`
+- 2）准备请求参数，也就是查询DSL对应的JSON参数
+- 3）发起请求
+- 4）解析响应，响应结果相对复杂，需要逐层解析
+
+
+
+### 基础使用
+
+**利用Java代码组织请求参数**，**解析响应结果**。
+
+
+
+#### 发送请求
+
+首先以`match_all`查询为例，其DSL和JavaAPI的对比如图：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723728775373-3.png)
+
+代码解读：
+
+-  第一步，创建`SearchRequest`对象，指定索引库名 
+-  第二步，利用`request.source()`构建DSL，DSL中可以包含查询、分页、排序、高亮等 
+  - `query()`：代表查询条件，利用`QueryBuilders.matchAllQuery()`构建一个`match_all`查询的DSL
+-  第三步，利用`client.search()`发送请求，得到响应 
+
+这里关键的API有两个，一个是`request.source()`，它构建的就是DSL中的完整JSON参数。其中包含了`query`、`sort`、`from`、`size`、`highlight`等所有功能：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723728775370-1.png)
+
+另一个是`QueryBuilders`，其中包含了我们学习过的各种**叶子查询**、**复合查询**等：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723728775370-2.png)
+
+
+
+#### 解析响应结果
+
+在发送请求以后，得到了响应结果`SearchResponse`，这个类的结构与我们在kibana中看到的响应结果JSON结构完全一致：
+
+```JSON
+{
+    "took" : 0,
+    "timed_out" : false,
+    "hits" : {
+        "total" : {
+            "value" : 2,
+            "relation" : "eq"
+        },
+        "max_score" : 1.0,
+        "hits" : [
+            {
+                "_index" : "heima",
+                "_type" : "_doc",
+                "_id" : "1",
+                "_score" : 1.0,
+                "_source" : {
+                "info" : "Java讲师",
+                "name" : "赵云"
+                }
+            }
+        ]
+    }
+}
+```
+
+因此，我们解析`SearchResponse`的代码就是在解析这个JSON结果，对比如下：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723728825985-10.png)
+
+**代码解读**：
+
+elasticsearch返回的结果是一个JSON字符串，结构包含：
+
+- `hits`：命中的结果 
+  - `total`：总条数，其中的value是具体的总条数值
+  - `max_score`：所有结果中得分最高的文档的相关性算分
+  - `hits`：搜索结果的文档数组，其中的每个文档都是一个json对象 
+    - `_source`：文档中的原始数据，也是json对象
+
+因此，我们解析响应结果，就是逐层解析JSON字符串，流程如下：
+
+- `SearchHits`：通过`response.getHits()`获取，就是JSON中的最外层的`hits`，代表命中的结果 
+  - `SearchHits#getTotalHits().value`：获取总条数信息
+  - `SearchHits#getHits()`：获取`SearchHit`数组，也就是文档数组 
+    - `SearchHit#getSourceAsString()`：获取文档结果中的`_source`，也就是原始的`json`文档数据
+
+
+
+#### 总结
+
+文档搜索的基本步骤是：
+
+1. 创建`SearchRequest`对象
+2. 准备`request.source()`，也就是DSL。
+   1. `QueryBuilders`来构建查询条件
+   2. 传入`request.source()` 的` query() `方法
+3. 发送请求，得到结果
+4. 解析结果（参考JSON结果，从外到内，逐层解析）
+
+
+
+### 叶子查询
+
+所有的查询条件都是由QueryBuilders来构建的，叶子查询也不例外。因此整套代码中变化的部分仅仅是query条件构造的方式，其它不动。
+
+例如`match`查询：
+
+```Java
+@Test
+void testMatch() throws IOException {
+    // 1.创建Request
+    SearchRequest request = new SearchRequest("items");
+    // 2.组织请求参数
+    request.source().query(QueryBuilders.matchQuery("name", "脱脂牛奶"));
+    // 3.发送请求
+    SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+    // 4.解析响应
+    handleResponse(response);
+}
+```
+
+再比如`multi_match`查询：
+
+```Java
+@Test
+void testMultiMatch() throws IOException {
+    // 1.创建Request
+    SearchRequest request = new SearchRequest("items");
+    // 2.组织请求参数
+    request.source().query(QueryBuilders.multiMatchQuery("脱脂牛奶", "name", "category"));
+    // 3.发送请求
+    SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+    // 4.解析响应
+    handleResponse(response);
+}
+```
+
+还有`range`查询：
+
+```Java
+@Test
+void testRange() throws IOException {
+    // 1.创建Request
+    SearchRequest request = new SearchRequest("items");
+    // 2.组织请求参数
+    request.source().query(QueryBuilders.rangeQuery("price").gte(10000).lte(30000));
+    // 3.发送请求
+    SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+    // 4.解析响应
+    handleResponse(response);
+}
+```
+
+还有`term`查询：
+
+```Java
+@Test
+void testTerm() throws IOException {
+    // 1.创建Request
+    SearchRequest request = new SearchRequest("items");
+    // 2.组织请求参数
+    request.source().query(QueryBuilders.termQuery("brand", "华为"));
+    // 3.发送请求
+    SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+    // 4.解析响应
+    handleResponse(response);
+}
+```
+
+
+
+### 复合查询
+
+复合查询也是由`QueryBuilders`来构建，我们以`bool`查询为例，DSL和JavaAPI的对比如图：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723728972019-13.png)
+
+完整代码如下：
+
+```Java
+@Test
+void testBool() throws IOException {
+    // 1.创建Request
+    SearchRequest request = new SearchRequest("items");
+    // 2.组织请求参数
+    // 2.1.准备bool查询
+    BoolQueryBuilder bool = QueryBuilders.boolQuery();
+    // 2.2.关键字搜索
+    bool.must(QueryBuilders.matchQuery("name", "脱脂牛奶"));
+    // 2.3.品牌过滤
+    bool.filter(QueryBuilders.termQuery("brand", "德亚"));
+    // 2.4.价格过滤
+    bool.filter(QueryBuilders.rangeQuery("price").lte(30000));
+    request.source().query(bool);
+    // 3.发送请求
+    SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+    // 4.解析响应
+    handleResponse(response);
+}
+```
+
+
+
+### 排序和分页
+
+`requeset.source()`就是整个请求JSON参数，所以排序、分页都是基于这个来设置，其DSL和JavaAPI的对比如下：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723728992422-16.png)
+
+完整示例代码：
+
+```Java
+@Test
+void testPageAndSort() throws IOException {
+    int pageNo = 1, pageSize = 5;
+
+    // 1.创建Request
+    SearchRequest request = new SearchRequest("items");
+    // 2.组织请求参数
+    // 2.1.搜索条件参数
+    request.source().query(QueryBuilders.matchQuery("name", "脱脂牛奶"));
+    // 2.2.排序参数
+    request.source().sort("price", SortOrder.ASC);
+    // 2.3.分页参数
+    request.source().from((pageNo - 1) * pageSize).size(pageSize);
+    // 3.发送请求
+    SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+    // 4.解析响应
+    handleResponse(response);
+}
+```
+
+
+
+### 高亮
+
+高亮查询与前面的查询有两点不同：
+
+- 条件同样是在`request.source()`中指定，只不过高亮条件要基于`HighlightBuilder`来构造
+- 高亮响应结果与搜索的文档结果不在一起，需要单独解析
+
+首先来看高亮条件构造，其DSL和JavaAPI的对比如图：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723729069828-19.png)
+
+示例代码如下：
+
+```Java
+@Test
+void testHighlight() throws IOException {
+    // 1.创建Request
+    SearchRequest request = new SearchRequest("items");
+    // 2.组织请求参数
+    // 2.1.query条件
+    request.source().query(QueryBuilders.matchQuery("name", "脱脂牛奶"));
+    // 2.2.高亮条件
+    request.source().highlighter(
+            SearchSourceBuilder.highlight()
+                    .field("name")
+                    .preTags("<em>")
+                    .postTags("</em>")
+    );
+    // 3.发送请求
+    SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+    // 4.解析响应
+    handleResponse(response);
+}
+```
+
+再来看结果解析，文档解析的部分不变，主要是高亮内容需要单独解析出来，其DSL和JavaAPI的对比如图：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723729069828-20.png)
+
+代码解读：
+
+- 第`3、4`步：从结果中获取`_source`。`hit.getSourceAsString()`，这部分是非高亮结果，json字符串。还需要反序列为`ItemDoc`对象
+- 第`5`步：获取高亮结果。`hit.getHighlightFields()`，返回值是一个`Map`，key是高亮字段名称，值是`HighlightField`对象，代表高亮值
+- 第`5.1`步：从`Map`中根据高亮字段名称，获取高亮字段值对象`HighlightField`
+- 第`5.2`步：从`HighlightField`中获取`Fragments`，并且转为字符串。这部分就是真正的高亮字符串了
+- 最后：用高亮的结果替换`ItemDoc`中的非高亮结果
+
+
+
+## 数据聚合
+
+聚合（`aggregations`）可以让我们极其方便的实现对数据的统计、分析、运算。例如：
+
+- 什么品牌的手机最受欢迎？
+- 这些手机的平均价格、最高价格、最低价格？
+- 这些手机每月的销售情况如何？
+
+实现这些统计功能的比数据库的sql要方便的多，而且查询速度非常快，可以实现近实时搜索效果。
+
+
+
+聚合常见的有三类：
+
+-  **桶（`Bucket`）**聚合：用来对文档做分组 
+  - `TermAggregation`：按照文档字段值分组，例如按照品牌值分组、按照国家分组
+  - `Date Histogram`：按照日期阶梯分组，例如一周为一组，或者一月为一组
+-  **度量（`Metric`）**聚合：用以计算一些值，比如：最大值、最小值、平均值等 
+  - `Avg`：求平均值
+  - `Max`：求最大值
+  - `Min`：求最小值
+  - `Stats`：同时求`max`、`min`、`avg`、`sum`等
+-  **管道（`pipeline`）**聚合：其它聚合的结果为基础做进一步运算 
+
+
+
+**注意：**参加聚合的字段必须是keyword、日期、数值、布尔类型
+
+
+
+### DSL实现聚合
+
+#### Bucket聚合
+
+例如我们要统计所有商品中共有哪些商品分类，其实就是以分类（category）字段对数据分组。category值一样的放在同一组，属于`Bucket`聚合中的`Term`聚合。
+
+基本语法如下：
+
+```JSON
+GET /items/_search
+{
+  "size": 0, 
+  "aggs": {
+    "category_agg": {
+      "terms": {
+        "field": "category",
+        "size": 20
+      }
+    }
+  }
+}
+```
+
+语法说明：
+
+- `size`：设置`size`为0，就是每页查0条，则结果中就不包含文档，只包含聚合
+- `aggs`：定义聚合
+  - `category_agg`：聚合名称，自定义，但不能重复
+    - `terms`：聚合的类型，按分类聚合，所以用`term`
+      - `field`：参与聚合的字段名称
+      - `size`：希望返回的聚合结果的最大数量
+
+来看下查询的结果：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723729259156-25.png)
+
+
+
+#### 带条件聚合
+
+真实场景下，用户会输入搜索条件，因此聚合必须是对搜索结果聚合。那么聚合必须添加限定条件。
+
+例如，我想知道价格高于3000元的手机品牌有哪些，该怎么统计呢？
+
+我们需要从需求中分析出搜索查询的条件和聚合的目标：
+
+- 搜索查询条件：
+  - 价格高于3000
+  - 必须是手机
+- 聚合目标：统计的是品牌，肯定是对brand字段做term聚合
+
+语法如下：
+
+```JSON
+GET /items/_search
+{
+  "query": {
+    "bool": {
+      "filter": [
+        {
+          "term": {
+            "category": "手机"
+          }
+        },
+        {
+          "range": {
+            "price": {
+              "gte": 300000
+            }
+          }
+        }
+      ]
+    }
+  }, 
+  "size": 0, 
+  "aggs": {
+    "brand_agg": {
+      "terms": {
+        "field": "brand",
+        "size": 20
+      }
+    }
+  }
+}
+```
+
+聚合结果如下：
+
+```JSON
+{
+  "took" : 2,
+  "timed_out" : false,
+  "hits" : {
+    "total" : {
+      "value" : 13,
+      "relation" : "eq"
+    },
+    "max_score" : null,
+    "hits" : [ ]
+  },
+  "aggregations" : {
+    "brand_agg" : {
+      "doc_count_error_upper_bound" : 0,
+      "sum_other_doc_count" : 0,
+      "buckets" : [
+        {
+          "key" : "华为",
+          "doc_count" : 7
+        },
+        {
+          "key" : "Apple",
+          "doc_count" : 5
+        },
+        {
+          "key" : "小米",
+          "doc_count" : 1
+        }
+      ]
+    }
+  }
+}
+```
+
+
+
+#### Metric聚合
+
+对桶内的商品做运算，获取每个品牌价格的最小值、最大值、平均值时，要用到`Metric`聚合，例如`stat`聚合，就可以同时获取`min`、`max`、`avg`等结果。
+
+语法如下：
+
+```JSON
+GET /items/_search
+{
+  "query": {
+    "bool": {
+      "filter": [
+        {
+          "term": {
+            "category": "手机"
+          }
+        },
+        {
+          "range": {
+            "price": {
+              "gte": 300000
+            }
+          }
+        }
+      ]
+    }
+  }, 
+  "size": 0, 
+  "aggs": {
+    "brand_agg": {
+      "terms": {
+        "field": "brand",
+        "size": 20
+      },
+      "aggs": {
+        "stats_meric": {
+          "stats": {
+            "field": "price"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+可以看到在`brand_agg`聚合的内部，新加了一个`aggs`参数。这个聚合就是`brand_agg`的子聚合，会对`brand_agg`形成的每个桶中的文档分别统计。
+
+- `stats_meric`：聚合名称
+  - `stats`：聚合类型，stats是`metric`聚合的一种
+    - `field`：聚合字段，这里选择`price`，统计价格
+
+
+
+#### 总结
+
+aggs代表聚合，与query同级，此时query的作用是：
+
+- 限定聚合的的文档范围
+
+聚合必须的三要素：
+
+- 聚合名称
+- 聚合类型
+- 聚合字段
+
+聚合可配置属性有：
+
+- size：指定聚合结果数量
+- order：指定聚合结果排序方式
+- field：指定聚合字段
+
+
+
+### RestClient实现聚合
+
+在DSL中，`aggs`聚合条件与`query`条件是同一级别，都属于查询JSON参数。因此依然是利用`request.source()`方法来设置。
+
+不过聚合条件的要利用`AggregationBuilders`这个工具类来构造。DSL与JavaAPI的语法对比如下：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723729516308-28.png)
+
+聚合结果与搜索文档同一级别，因此需要单独获取和解析。具体解析语法如下：
+
+![img](D:\Code\Java\SpringCloud-Note\assets\1723729516308-29.png)
