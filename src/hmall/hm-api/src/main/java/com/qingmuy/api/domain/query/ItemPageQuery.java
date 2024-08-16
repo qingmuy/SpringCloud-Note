@@ -1,4 +1,4 @@
-package com.qingmuy.item.domain.query;
+package com.qingmuy.api.domain.query;
 
 import com.hmall.common.domain.PageQuery;
 import io.swagger.annotations.ApiModel;

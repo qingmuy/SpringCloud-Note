@@ -1,0 +1,5 @@
+server:
+  port: 8087
+elasticsearch:
+  host: 192.168.197.133
+  port: 9200

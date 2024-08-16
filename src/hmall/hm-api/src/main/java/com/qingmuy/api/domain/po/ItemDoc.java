@@ -1,13 +1,11 @@
-package com.qingmuy.item.domain.po;
+package com.qingmuy.api.domain.po;
 
-import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
 @Data
-@ApiModel(description = "索引库实体")
 public class ItemDoc{
 
     @ApiModelProperty("商品id")

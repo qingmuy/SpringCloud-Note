@@ -31,6 +31,7 @@ public class ItemController {
         Page<Item> result = itemService.page(query.toMpPage("update_time", false));
         // 2.封装并返回
         return PageDTO.of(result, ItemDTO.class);
+
     }
 
     @ApiOperation("根据id批量查询商品")
